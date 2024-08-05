@@ -1,0 +1,14 @@
+{
+  "name": "hardhat-project",
+  "dependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@uniswap/v2-core": "^1.0.1",
+    "@uniswap/v2-sdk": "^4.4.1",
+    "@uniswap/v3-sdk": "^3.13.1"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}
