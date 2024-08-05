@@ -114,6 +114,11 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         withdrawalFee = _withdrawalFee;
     }
 
+    function withdrawFeesByOwner(address _receiverFeeAddress) external onlyOwner {
+        (bool success, ) = _receiverFeeAddress.call{value: totalFees}("");
+        require(success, "ETH transfer failed");
+    }
+
     function addToken(address _token, uint256 _targetPercentage, string memory _version, uint24 _feeTier) external onlyOwner {
         require(_targetPercentage <= 10000, "Invalid percentage");
         portfolio.push(TokenInfo({
@@ -143,12 +148,11 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         // Swap ETH to portfolio tokens
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
-            uint256 swapAmount = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
-            try this.swapETHForToken(tokenInfo.token, swapAmount, tokenInfo.version, tokenInfo.feeTier) {
+            try this.swapETHForToken(tokenInfo.token, amountAfterFee, tokenInfo.version, tokenInfo.feeTier) {
             } catch {
-                failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, swapAmount, tokenInfo.version, tokenInfo.feeTier));
+                failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, amountAfterFee, tokenInfo.version, tokenInfo.feeTier));
                 userFailedSwaps[msg.sender]++;
-                emit SwapFailed(msg.sender, tokenInfo.token, swapAmount, tokenInfo.version);
+                emit SwapFailed(msg.sender, tokenInfo.token, amountAfterFee, tokenInfo.version);
             }
         }
     }
@@ -252,7 +256,9 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
                     removeFailedSwap(i);
                     userFailedSwaps[user]--;
                 } catch {
-                    // If the retry fails, we just leave it in the queue
+                    failedSwaps.push(FailedSwap(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier));
+                    userFailedSwaps[msg.sender]++;
+                    emit SwapFailed(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version);
                 }
             }
         }
@@ -314,7 +320,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         emit Rebalanced(block.timestamp);
     }
 
-    function swapTokenForETH(IERC20 _token, uint256 _amountIn, string memory version, uint24 feeTier) internal returns (uint256) {
+    function swapTokenForETH(IERC20 _token, uint256 _amountIn, string memory version, uint24 feeTier) external returns (uint256) {
         if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v2"))) {
                 address[] memory path = new address[](2);
                 path[0] = address(_token);
@@ -334,7 +340,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         }
     }
 
-    function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) internal {
+    function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) external {
         // Calculate the minimum amount of tokens to receive, considering slippage tolerance
         if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v2"))) {
             address[] memory path = new address[](2);
