@@ -55,6 +55,9 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         uniswapV3Router = ISwapRouter(_uniswapV3Router);
         uniswapV3Quoter = IUniswapV3Quoter(_uniswapV3Quoter);
         whitelist[msg.sender] = true;
+        slippageTolerance = 1000;
+        withdrawalFee = 100;
+        depositFee = 100;
     }
 
     modifier onlyWhitelisted() {
@@ -89,12 +92,12 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
                 path[1] = uniswapV2Router.WETH();
                 uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(tokenBalance, path);
                 uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-                totalETH += swapTokenForETHV2(tokenInfo.token, tokenBalance, amountOutMinimum);
+                totalETH += swapTokenForETHV2(tokenInfo.token, tokenBalance, amountOutMinimum, msg.sender);
             } else if (keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))) {
                 bytes memory path = abi.encodePacked(address(tokenInfo.token), tokenInfo.feeTier, uniswapV2Router.WETH());
                 uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, tokenBalance);
                 uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-                totalETH += swapTokenForETHV3(tokenInfo.token, tokenBalance, tokenInfo.feeTier, amountOutMinimum);
+                totalETH += swapTokenForETHV3(tokenInfo.token, tokenBalance, tokenInfo.feeTier, amountOutMinimum, msg.sender);
             } else {
                 revert("Invalid Uniswap version");
             }
@@ -139,25 +142,21 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         totalFees += fee;
 
         require(amountAfterFee > 0, "Amount after fee must be greater than zero");
+        _mint(msg.sender, amountAfterFee);
+        emit Deposited(msg.sender, amountAfterFee, amountAfterFee, "N/A");
 
         // Swap ETH to portfolio tokens
-        uint256 totalTokensSwapped = 0;
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
-            uint256 calAmountTokenBasedOnAllocation = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
-            try this.swapETHForToken(tokenInfo.token, calAmountTokenBasedOnAllocation, tokenInfo.version, tokenInfo.feeTier) returns (uint256[] memory amounts) {
-                // Mint ERC20 tokens equivalent to the amount of ETH deposited
-                totalTokensSwapped+=amounts[0];
-            } catch {
+            uint256 calEthAmount = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
+            try this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier) {} catch {
                 // todo: here should remain how much ETH is failed
-                // ethDepositedFailed[msg.sender] += calAmountTokenBasedOnAllocation;
-                failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, calAmountTokenBasedOnAllocation, tokenInfo.version, tokenInfo.feeTier));
+                ethDepositedFailed[msg.sender] += calEthAmount;
+                failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier));
                 userFailedSwaps[msg.sender]++;
-                emit SwapFailed(msg.sender, tokenInfo.token, calAmountTokenBasedOnAllocation, tokenInfo.version);
+                emit SwapFailed(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version);
             }
         }
-        _mint(msg.sender, totalTokensSwapped);
-        emit Deposited(msg.sender, amountAfterFee, amountAfterFee, "N/A");
     }
 
     function withdrawToETH(uint256 tokenAmount) external whenNotPaused {
@@ -231,17 +230,17 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
                 path[1] = uniswapV2Router.WETH();
                 uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(fee, path);
                 uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-                totalFees += swapTokenForETHV2(tokenInfo.token, fee, amountOutMinimum);
+                totalFees += swapTokenForETHV2(tokenInfo.token, fee, amountOutMinimum, address(this));
             } else if (keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))) {
                 bytes memory path = abi.encodePacked(address(tokenInfo.token), tokenInfo.feeTier, uniswapV2Router.WETH());
                 uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, fee);
                 uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-                totalFees += swapTokenForETHV3(tokenInfo.token, fee, tokenInfo.feeTier, amountOutMinimum);
+                totalFees += swapTokenForETHV3(tokenInfo.token, fee, tokenInfo.feeTier, amountOutMinimum, address(this));
             } else {
                 revert("Invalid Uniswap version");
             }
         }
-        uint256 failedETHsUser = ethDepositedFailed[msg.sender];
+        uint256 failedETHsUser = (ethDepositedFailed[msg.sender] * userShare) / 10000;
         uint256 totalTransferAmount = failedETHsUser;
         (bool success, ) = msg.sender.call{value: totalTransferAmount}("");
         require(success, "transfer will revert");
@@ -252,7 +251,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         for (uint256 i = 0; i < failedSwaps.length; i++) {
             if (failedSwaps[i].user == user) {
                 FailedSwap memory failedSwap = failedSwaps[i];
-                try this.swapETHForToken(failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier) {
+                try this.swapETHForToken{value: failedSwap.amount}(failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier) {
                     removeFailedSwap(i);
                     userFailedSwaps[user]--;
                 } catch {
@@ -342,20 +341,20 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
                 path[1] = uniswapV2Router.WETH();
                 uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amountIn, path);
                 uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-            return swapTokenForETHV2(_token, _amountIn, amountOutMinimum);
+            return swapTokenForETHV2(_token, _amountIn, amountOutMinimum, address(this));
         } else if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v3"))) {
              bytes memory path = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
              uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _amountIn);
 
              // Calculate the minimum amount of ETH to receive, considering slippage tolerance
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-            return swapTokenForETHV3(_token, _amountIn, feeTier, amountOutMinimum);
+            return swapTokenForETHV3(_token, _amountIn, feeTier, amountOutMinimum, address(this));
         } else {
             revert("Invalid Uniswap version");
         }
     }
 
-    function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) external returns(uint256[] memory amounts){
+    function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) external payable {
         // Calculate the minimum amount of tokens to receive, considering slippage tolerance
         if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v2"))) {
             address[] memory path = new address[](2);
@@ -363,18 +362,18 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
             path[1] = address(_token);
             uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_ethAmount, path);
             uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-            amounts = swapETHForTokenV2(_token, _ethAmount, amountOutMinimum);
+            swapETHForTokenV2(_token, _ethAmount, amountOutMinimum);
         } else if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v3"))) {
             bytes memory path = abi.encodePacked(uniswapV2Router.WETH(), feeTier, address(_token));
             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _ethAmount);
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-            amounts = swapETHForTokenV3(_token, _ethAmount, feeTier, amountOutMinimum);
+            swapETHForTokenV3(_token, _ethAmount, feeTier, amountOutMinimum);
         } else {
             revert("Invalid Uniswap version");
         }
     }
 
-    function swapTokenForETHV2(IERC20 _token, uint256 _amountIn, uint256 amountOutMinimum) internal returns (uint256) {
+    function swapTokenForETHV2(IERC20 _token, uint256 _amountIn, uint256 amountOutMinimum, address receiver) internal returns (uint256) {
         address[] memory path = new address[](2);
         path[0] = address(_token);
         path[1] = uniswapV2Router.WETH();
@@ -385,7 +384,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
             _amountIn,
             amountOutMinimum, // minimum amount of ETH to receive
             path,
-            address(this),
+            receiver,
             block.timestamp
         );
 
@@ -405,13 +404,13 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         );
     }
 
-    function swapTokenForETHV3(IERC20 _token, uint256 _amountIn, uint24 feeTier, uint256 amountOutMinimum) internal returns (uint256) {
+    function swapTokenForETHV3(IERC20 _token, uint256 _amountIn, uint24 feeTier, uint256 amountOutMinimum, address receiver) internal returns (uint256) {
         ISwapRouter.ExactInputSingleParams memory params =
             ISwapRouter.ExactInputSingleParams({
                 tokenIn: address(_token),
                 tokenOut: uniswapV2Router.WETH(),
                 fee: feeTier, // Pool fee tier
-                recipient: address(this),
+                recipient: receiver,
                 deadline: block.timestamp,
                 amountIn: _amountIn,
                 amountOutMinimum: amountOutMinimum, // minimum amount of ETH to receive
@@ -447,14 +446,14 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
             uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amount, path);
             uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
 
-            amountOut = swapTokenForETHV2(_token, _amount, amountOutMinimum);
+            amountOut = swapTokenForETHV2(_token, _amount, amountOutMinimum, address(this));
             profitToETH += amountOut;
         } else if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v3"))) {
             bytes memory pathV3 = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(pathV3, _amount);
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
 
-            amountOut = swapTokenForETHV3(_token, _amount, feeTier, amountOutMinimum);
+            amountOut = swapTokenForETHV3(_token, _amount, feeTier, amountOutMinimum, address(this));
             profitToETH += amountOut;
         } else {
             revert("Invalid Uniswap version");
