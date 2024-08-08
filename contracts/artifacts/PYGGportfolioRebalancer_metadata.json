@@ -1349,11 +1349,11 @@
 			]
 		},
 		"contracts/PYGGportfolioRebalancer.sol": {
-			"keccak256": "0x34dc779d5e44bfb24344188515487478a8afc35f95a0b1c5d6fc31d2696aa577",
+			"keccak256": "0x9d6ffbf850b80de71eb4207bc8250475a707da1d588177c083bd7185b212c41f",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://04066f7c120b253a3afc6d51de67a4b8d6f76d690ace09b59fe73a52597a2f17",
-				"dweb:/ipfs/QmZ39yLi4zRJ5whd8xjBc67H2wkic9PHX5dPr2HUKGcBMZ"
+				"bzz-raw://08e35154d5764bfd09e6c32b6611540e7dc6e6b1da7cc1920c048837901549ad",
+				"dweb:/ipfs/Qmbb2hDseLjvGRXEFdfW3C1sT4GmBsrjy5x3dRnwHJfZNm"
 			]
 		},
 		"contracts/interface/IUniswapV2Router01.sol": {

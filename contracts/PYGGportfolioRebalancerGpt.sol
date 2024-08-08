@@ -149,12 +149,16 @@ contract PYGGportfolioRebalancerGpt is Ownable, Pausable, ERC20 {
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 calEthAmount = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
-            try this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier) {} catch {
-                ethDepositedFailed[msg.sender] += calEthAmount;
-                failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier));
-                userFailedSwaps[msg.sender]++;
-                emit SwapFailed(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version);
-            }
+            require(calEthAmount <= amountAfterFee, "Calculated ETH amount exceeds available amount");
+            this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier);
+            // try this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier) {} catch {
+            //     ethDepositedFailed[msg.sender] += calEthAmount;
+            //     failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier));
+            //     userFailedSwaps[msg.sender]++;
+            //     emit SwapFailed(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version);
+            // }
+            // Adjust amountAfterFee to reflect the used ETH
+            amountAfterFee -= calEthAmount;
         }
     }
 
@@ -178,8 +182,8 @@ contract PYGGportfolioRebalancerGpt is Ownable, Pausable, ERC20 {
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * sharesToWithdraw) / totalSupply();
             uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000; 
             uint256 amountAfterFee = tokenAmountToWithdraw - fee;
-            uint256 ethReceived = this.swapTokenForETH(tokenInfo.token, amountAfterFee, tokenInfo.version, tokenInfo.feeTier);
-            totalETH += ethReceived;
+            // uint256 ethReceived = this.swapTokenForETH(tokenInfo.token, amountAfterFee, tokenInfo.version, tokenInfo.feeTier);
+            // totalETH += ethReceived;
         }
 
         uint256 feeETH = (totalETH * withdrawalFee) / 10000;
@@ -411,7 +415,7 @@ contract PYGGportfolioRebalancerGpt is Ownable, Pausable, ERC20 {
         return uniswapV3Router.exactInputSingle(params);
     }
 
-    function swapETHForTokenV3(IERC20 _token, uint256 _ethAmount, uint24 feeTier, uint256 amountOutMinimum) internal returns (uint256[] memory amounts) {
+    function swapETHForTokenV3(IERC20 _token, uint256 _ethAmount, uint24 feeTier, uint256 amountOutMinimum) internal {
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: uniswapV2Router.WETH(),
             tokenOut: address(_token),
@@ -424,8 +428,7 @@ contract PYGGportfolioRebalancerGpt is Ownable, Pausable, ERC20 {
         });
 
         
-        amounts[1] = uniswapV3Router.exactInputSingle{value: _ethAmount}(params);
-        amounts[0] = _ethAmount;
+        uniswapV3Router.exactInputSingle{value: _ethAmount}(params);
     }
 
     function sellTokens(IERC20 _token, uint256 _amount, string memory version, uint24 feeTier) internal returns (uint256 amountOut) {
