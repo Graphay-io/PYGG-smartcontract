@@ -798,6 +798,25 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "uint256[]",
+						"name": "_tokenPrices",
+						"type": "uint256[]"
+					}
+				],
+				"name": "shouldRebalance",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "slippageTolerance",
 				"outputs": [
@@ -887,7 +906,20 @@
 			},
 			{
 				"inputs": [],
-				"name": "totalFees",
+				"name": "totalFeesToETH",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "totalFeesToWETH",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -1349,11 +1381,11 @@
 			]
 		},
 		"contracts/PYGGportfolioRebalancerGpt.sol": {
-			"keccak256": "0x7b755eed6964d7a36cb37df6b4f1db3bab1fef288a6f288fbc779725978e3cdb",
+			"keccak256": "0x5c994ea5571046975ff8aa7ee149d40f2b6e05c34bf5ad674d751443acf7e15a",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://042abcf1d394f3dcbad9de7d79d4b00be953228524854238fbebd6fb85f9399a",
-				"dweb:/ipfs/QmetCExHT4CQWMJ5eocSwEGMXv31VS7ByDe7Zk9dmY9YkY"
+				"bzz-raw://fc444ec2eb8cd68c0f77440e8c7f1c86c8cea884868237e5c3ac69578df281ac",
+				"dweb:/ipfs/QmSQpXoX557RweavSNzgMD93hhagr76mBeq2aBxg7D9G1N"
 			]
 		},
 		"contracts/interface/IUniswapV2Router01.sol": {
@@ -1375,6 +1407,14 @@
 			"urls": [
 				"bzz-raw://063b421b33ff8c3da3efba744a3be6490b9659773b996205a6eee874a86c903a",
 				"dweb:/ipfs/QmRUdtYX7EhHRcfobahCzxr5KVD64krDrvYcUwTd1UMTL1"
+			]
+		},
+		"contracts/interface/IWETH.sol": {
+			"keccak256": "0x0b72127ded09ba8fc86c43905ade49d6f04563e101e2c539a18f1bd463d96736",
+			"license": "GPL-2.0-or-later",
+			"urls": [
+				"bzz-raw://05849a5c1f8050e3fa1a21a93428a5f19dc0e4d899e84e997c0b4b36d6e03224",
+				"dweb:/ipfs/QmejKrEVQQN3v749r9RYLmAoVs8UrBtMySb3uuKRXphjiK"
 			]
 		}
 	},
