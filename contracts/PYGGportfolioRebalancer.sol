@@ -8,14 +8,15 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interface/IUniswapV2Router02.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "./interface/IUniswapV3Quoter.sol";
+import "./interface/IWETH.sol";
 
 contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
 
     struct TokenInfo {
         IERC20 token;
-        uint256 targetPercentage; // Target allocation in basis points (e.g., 40% -> 4000)'
-        string version;           // Uniswap version (e.g., "v2" or "v3")
-        uint24 feeTier;           // Uniswap v3 fee tier (ignored for v2)
+        uint256 targetPercentage;
+        string version;
+        uint24 feeTier;
     }
 
     struct FailedSwap {
@@ -38,18 +39,23 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
     uint256 public depositFee; // Fee in basis points (e.g., 100 = 1%)
     uint256 public withdrawalFee; // Fee in basis points (e.g., 100 = 1%)
     uint256 public slippageTolerance; // Slippage tolerance in basis points (e.g., 100 = 1%)
-    uint256 public totalFees;
+    uint256 public totalFeesToETH;
+    uint256 public totalFeesToWETH;
     uint256 public profitToETH;
+    uint256 public profitToWETH;
 
-    event Deposited(address indexed user, uint256 amount, uint256 shares, string version);
-    event Withdrawn(address indexed user, uint256 amount, uint256 shares);
-    event Rebalanced(uint256 timestamp);
-    event Whitelisted(address indexed user, bool isWhitelisted);
-    event SwapFailed(address indexed user, IERC20 token, uint256 amount, string version);
-    event SlippageToleranceChanged(uint256 newSlippageTolerance);
+    bytes32 private constant VERSION_V2 = keccak256(abi.encodePacked("v2"));
+    bytes32 private constant VERSION_V3 = keccak256(abi.encodePacked("v3"));
+
+    // event Deposited(address indexed user, uint256 amount, uint256 shares, string version);
+    // event Withdrawn(address indexed user, uint256 amount, uint256 shares);
+    // event Rebalanced(uint256 timestamp);
+    // event Whitelisted(address indexed user, bool isWhitelisted);
+    // event SwapFailed(address indexed user, IERC20 token, uint256 amount, string version);
+    // event SlippageToleranceChanged(uint256 newSlippageTolerance);
 
     constructor(address _uniswapV2Router, address _uniswapV3Router, address _uniswapV3Quoter)
-        Ownable(msg.sender) ERC20("PYGG Wrapped Portfolio", "PYGG")
+        Ownable(msg.sender) ERC20("PYGGETH", "PETH")
     {
         uniswapV2Router = IUniswapV2Router02(_uniswapV2Router);
         uniswapV3Router = ISwapRouter(_uniswapV3Router);
@@ -61,190 +67,240 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
     }
 
     modifier onlyWhitelisted() {
-        require(whitelist[msg.sender], "Not whitelisted");
+        require(whitelist[msg.sender], "!WHT");
         _;
     }
 
     function setSlippageTolerance(uint256 _slippageTolerance) external onlyOwner {
-        require(_slippageTolerance <= 10000, "Invalid slippage tolerance");
+        require(_slippageTolerance <= 10000, "!SLP");
         slippageTolerance = _slippageTolerance;
-        emit SlippageToleranceChanged(_slippageTolerance);
+        // emit SlippageToleranceChanged(_slippageTolerance);
     }
 
-    function pause() external onlyOwner {
-        _pause();
-        emit Paused(msg.sender);
-    }
+    // function pause() external onlyOwner {
+    //     _pause();
+    //     emit Paused(msg.sender);
+    // }
 
-    function unpause() external onlyOwner {
-        _unpause();
-        emit Unpaused(msg.sender);
-    }
+    // function unpause() external onlyOwner {
+    //     _unpause();
+    //     emit Unpaused(msg.sender);
+    // }
 
     function withdrawAllToETH() external onlyOwner {
         uint256 totalETH = 0;
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenBalance = tokenInfo.token.balanceOf(address(this));
-            if (keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v2"))) {
+            if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V2) {
                 address[] memory path = new address[](2);
                 path[0] = address(tokenInfo.token);
                 path[1] = uniswapV2Router.WETH();
                 uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(tokenBalance, path);
                 uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
                 totalETH += swapTokenForETHV2(tokenInfo.token, tokenBalance, amountOutMinimum, msg.sender);
-            } else if (keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))) {
+            } else if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3) {
                 bytes memory path = abi.encodePacked(address(tokenInfo.token), tokenInfo.feeTier, uniswapV2Router.WETH());
                 uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, tokenBalance);
                 uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
                 totalETH += swapTokenForETHV3(tokenInfo.token, tokenBalance, tokenInfo.feeTier, amountOutMinimum, msg.sender);
             } else {
-                revert("Invalid Uniswap version");
+                revert("InvalidVS");
             }
         }
-
-        (bool success, ) = msg.sender.call{value: totalETH}("");
-        require(success, "ETH transfer failed");
+        if(totalETH > 0){
+            (bool success, ) = msg.sender.call{value: totalETH}("");
+            require(success, "FAILEDETH");
+        }
     }
 
     function setWhitelist(address _user, bool _status) external onlyOwner {
         whitelist[_user] = _status;
-        emit Whitelisted(_user, _status);
+        // emit Whitelisted(_user, _status);
     }
 
     function setFees(uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
-        require(_depositFee <= 10000, "Invalid deposit fee");
-        require(_withdrawalFee <= 10000, "Invalid withdrawal fee");
+        require(_depositFee <= 10000, "!dfee");
+        require(_withdrawalFee <= 10000, "!wfee");
         depositFee = _depositFee;
         withdrawalFee = _withdrawalFee;
     }
 
     function withdrawFeesByOwner(address _receiverFeeAddress) external onlyOwner {
-        (bool success, ) = _receiverFeeAddress.call{value: totalFees}("");
-        require(success, "ETH transfer failed");
+        if(totalFeesToETH > 0){
+            (bool success, ) = _receiverFeeAddress.call{value: totalFeesToETH}("");
+            require(success, "FAILEDETH");
+            totalFeesToETH = 0;
+        }
+        if(totalFeesToWETH > 0){
+            address WETH9 = uniswapV2Router.WETH();
+            IWETH(WETH9).transfer(_receiverFeeAddress, totalFeesToWETH);
+            totalFeesToWETH = 0;
+        }
     }
 
-    function addToken(address _token, uint256 _targetPercentage, string memory _version, uint24 _feeTier) external onlyOwner {
-        require(_targetPercentage <= 10000, "Invalid percentage");
-        portfolio.push(TokenInfo({
-            token: IERC20(_token),
-            targetPercentage: _targetPercentage,
-            version: _version,
-            feeTier: _feeTier
-        }));
+    function bulkAddTokens(
+        address[] calldata _tokens, 
+        uint256[] calldata _targetPercentages, 
+        string[] calldata _versions, 
+        uint24[] calldata _feeTiers
+    )    
+    external 
+    onlyOwner 
+    {
+        require(
+            _tokens.length == _targetPercentages.length && 
+            _tokens.length == _versions.length && 
+            _tokens.length == _feeTiers.length, 
+            "!Misslengths"
+        );
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            require(_targetPercentages[i] <= 10000, "!percentage");
+
+            portfolio.push(TokenInfo({
+                token: IERC20(_tokens[i]),
+                targetPercentage: _targetPercentages[i],
+                version: _versions[i],
+                feeTier: _feeTiers[i]
+            }));
+        }
     }
+
+    // function updateToken(
+    //     address _token, 
+    //     uint256 _targetPercentage, 
+    //     string memory _version, 
+    //     uint24 _feeTier
+    // ) 
+    // external 
+    // onlyOwner 
+    // {
+    //     require(_targetPercentage <= 10000, "!P>10000");
+
+    //     bool tokenFound = false;
+
+    //     for (uint256 i = 0; i < portfolio.length; i++) {
+    //      if (address(portfolio[i].token) == _token) {
+    //         portfolio[i].targetPercentage = _targetPercentage;
+    //         portfolio[i].version = _version;
+    //         portfolio[i].feeTier = _feeTier;
+    //         tokenFound = true;
+    //         break;
+    //      }
+    //     }
+
+    //     require(tokenFound, "!token");
+    // }
+
 
     function deposit() external payable onlyWhitelisted whenNotPaused {
-        require(msg.value > 0, "Amount must be greater than zero");
+        require(msg.value > 0, "AMG");
 
         uint256 fee = (msg.value * depositFee) / 10000;
         uint256 amountAfterFee = msg.value - fee;
-        totalFees += fee;
+        totalFeesToETH += fee;
 
         require(amountAfterFee > 0, "Amount after fee must be greater than zero");
         _mint(msg.sender, amountAfterFee);
-        emit Deposited(msg.sender, amountAfterFee, amountAfterFee, "N/A");
+        // emit Deposited(msg.sender, amountAfterFee, amountAfterFee, "N/A");
 
         // Swap ETH to portfolio tokens
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 calEthAmount = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
+            require(calEthAmount <= amountAfterFee, "calETH<=amountfee");
+            // this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier);
             try this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier) {} catch {
-                // todo: here should remain how much ETH is failed
                 ethDepositedFailed[msg.sender] += calEthAmount;
                 failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier));
                 userFailedSwaps[msg.sender]++;
-                emit SwapFailed(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version);
+                // emit SwapFailed(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version);
             }
+            // Adjust amountAfterFee to reflect the used ETH
         }
     }
 
     function withdrawToETH(uint256 tokenAmount) external whenNotPaused {
-        require(tokenAmount > 0, "Amount must be greater than zero");
-        require(this.balanceOf(msg.sender) >= tokenAmount, "Insufficient balance");
+        require(tokenAmount > 0, ">0");
+        require(this.balanceOf(msg.sender) >= tokenAmount, "!Insufficient");
 
         uint256 percentage = (tokenAmount * 10000) / totalSupply();
 
-        require(percentage > 0 && percentage <= 10000, "Percentage must be between 0 and 10000");
-
-        uint256 sharesToWithdraw = (totalSupply() * percentage) / 10000;
-
-        require(sharesToWithdraw > 0, "Amount must be greater than zero");
-
-        _burn(msg.sender, tokenAmount);
-
-        // Swap user's share of portfolio tokens to ETH and transfer ETH to user
+        require(percentage > 0 && percentage <= 10000, "0&10000");
+        address WETH9 = uniswapV2Router.WETH();
         uint256 totalETH = 0;
+        uint256 totalWETH = 0;
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
-            uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * sharesToWithdraw) / totalSupply();
-            uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000; 
-            uint256 amountAfterFee = tokenAmountToWithdraw - fee;
-            uint256 ethReceived = this.swapTokenForETH(tokenInfo.token, amountAfterFee, tokenInfo.version, tokenInfo.feeTier);
-            totalETH += ethReceived;
-                // Burn the user's ERC20 tokens
-            // try  returns (uint256 ethReceived) {
-                
-            // } catch {
-            //     failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, amountAfterFee, tokenInfo.version, tokenInfo.feeTier));
-            //     userFailedSwaps[msg.sender]++;
-            //     emit SwapFailed(msg.sender, tokenInfo.token, amountAfterFee, tokenInfo.version);
-            // }
+            uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * percentage) / 10000;
+            // uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000; 
+            // uint256 amountAfterFeeETH = tokenAmountToWithdraw - fee;
+            uint256 ethReceived = this.swapTokenForETH(tokenInfo.token, tokenAmountToWithdraw, tokenInfo.version, tokenInfo.feeTier);
+            if(keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))){
+                totalWETH+= ethReceived;
+            } else {
+                totalETH += ethReceived;
+            }
         }
-        uint256 feeETH = (totalETH * withdrawalFee) / 10000;
-        uint256 amountAfterfee = totalETH - feeETH;
-        totalFees += feeETH;
-        uint256 failedETHsUser = ethDepositedFailed[msg.sender];
-        uint256 totalTransferAmount = failedETHsUser + amountAfterfee;
-        (bool success, ) = msg.sender.call{value: totalTransferAmount}("");
-        require(success, "ETH transfer failed");
-
-        emit Withdrawn(msg.sender, totalETH, sharesToWithdraw);
+        _burn(msg.sender, tokenAmount);
+        if(totalWETH > 0){
+            uint256 feeWETH = (totalWETH * withdrawalFee) / 10000;
+            uint256 amountAfterFeeWETH = totalWETH - feeWETH;
+            totalFeesToWETH += feeWETH;
+            IWETH(WETH9).transfer(msg.sender, amountAfterFeeWETH);
+        }
+        if(totalETH > 0){
+            uint256 feeETH = (totalETH * withdrawalFee) / 10000;
+            uint256 amountAfterFee = totalETH - feeETH;
+            totalFeesToETH += feeETH;
+            uint256 failedETHsUser = ethDepositedFailed[msg.sender];
+            uint256 totalTransferAmount = failedETHsUser + amountAfterFee;
+            (bool success, ) = msg.sender.call{value: totalTransferAmount}("");
+            require(success, "ETH transfer failed");
+        }
+        // emit Withdrawn(msg.sender, totalETH, percentage);
     }
 
     function withdraw(uint256 tokenAmount) external whenNotPaused {
-        require(tokenAmount > 0, "Amount must be greater than zero");
-        require(this.balanceOf(msg.sender) >= tokenAmount, "Insufficient balance");
+        require(tokenAmount > 0, ">0");
+        require(this.balanceOf(msg.sender) >= tokenAmount, "Insufficient");
 
         uint256 userShare = (tokenAmount * 10000) / totalSupply();
 
-        require(userShare > 0 && userShare <= 10000, "Percentage must be between 0 and 10000");
+        require(userShare > 0 && userShare <= 10000, "0&10000");
 
-        uint256 sharesToWithdraw = (totalSupply() * userShare) / 10000;
 
-        require(sharesToWithdraw > 0, "Amount must be greater than zero");
-
-        // Burn the user's ERC20 tokens
-        _burn(msg.sender, tokenAmount);
-
-        // Redeem user's shares for portfolio tokens or ETH
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
-            uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * sharesToWithdraw) / totalSupply();
+            uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * userShare) / 10000;
             uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000;
             uint256 amountAfterFee = tokenAmountToWithdraw - fee;
             tokenInfo.token.transfer(msg.sender, amountAfterFee);
-            if (keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v2"))) {
+            if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V2) {
                 address[] memory path = new address[](2);
                 path[0] = address(tokenInfo.token);
                 path[1] = uniswapV2Router.WETH();
                 uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(fee, path);
                 uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-                totalFees += swapTokenForETHV2(tokenInfo.token, fee, amountOutMinimum, address(this));
-            } else if (keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))) {
+                totalFeesToETH += swapTokenForETHV2(tokenInfo.token, fee, amountOutMinimum, address(this));
+            } else if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3) {
                 bytes memory path = abi.encodePacked(address(tokenInfo.token), tokenInfo.feeTier, uniswapV2Router.WETH());
                 uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, fee);
                 uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-                totalFees += swapTokenForETHV3(tokenInfo.token, fee, tokenInfo.feeTier, amountOutMinimum, address(this));
+                totalFeesToWETH += swapTokenForETHV3(tokenInfo.token, fee, tokenInfo.feeTier, amountOutMinimum, address(this));
             } else {
                 revert("Invalid Uniswap version");
             }
         }
+
+        _burn(msg.sender, tokenAmount);
         uint256 failedETHsUser = (ethDepositedFailed[msg.sender] * userShare) / 10000;
         uint256 totalTransferAmount = failedETHsUser;
-        (bool success, ) = msg.sender.call{value: totalTransferAmount}("");
-        require(success, "transfer will revert");
-        emit Withdrawn(msg.sender, userShare, sharesToWithdraw);
+        if(totalTransferAmount > 0){
+            (bool success, ) = msg.sender.call{value: totalTransferAmount}("");
+            require(success, "TR");
+        }
+        // emit Withdrawn(msg.sender, userShare, userShare);
     }
 
     function retryFailedSwaps(address user) external onlyOwner {
@@ -257,7 +313,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
                 } catch {
                     failedSwaps.push(FailedSwap(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier));
                     userFailedSwaps[msg.sender]++;
-                    emit SwapFailed(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version);
+                    // emit SwapFailed(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version);
                 }
             }
         }
@@ -276,13 +332,13 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
     }
 
     function removeFailedSwap(uint256 index) internal {
-        require(index < failedSwaps.length, "Invalid index");
+        require(index < failedSwaps.length, "!index");
         failedSwaps[index] = failedSwaps[failedSwaps.length - 1];
         failedSwaps.pop();
     }
 
     function getPortfolioValue(uint256[] memory _tokenPrices) public view returns (uint256) {
-        require(_tokenPrices.length == portfolio.length, "Invalid prices length");
+        require(_tokenPrices.length == portfolio.length, "!priceslength");
         uint256 totalValue = 0;
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
@@ -302,74 +358,105 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         return targetValues;
     }
 
-    function getTokenValueAtPrice(uint256 _price, uint256 tokenBalance) internal pure returns (uint256) {
-        return tokenBalance * _price;
+    function getAllTokens() external view returns (TokenInfo[] memory) {
+        return portfolio;
     }
 
+    // function needsRebalance(uint256[] memory _tokenPrices) external view returns (bool) {
+    //     require(_tokenPrices.length == portfolio.length, "!PL");
+
+    //     uint256 totalValue = getPortfolioValue(_tokenPrices);
+    //     require(totalValue > 0, "TV>0");
+
+    //     for (uint256 i = 0; i < portfolio.length; i++) {
+    //         TokenInfo storage tokenInfo = portfolio[i];
+    //         uint256 currentPrice = _tokenPrices[i] * tokenInfo.token.balanceOf(address(this));
+    //         require(currentPrice > 0, "CP>0");
+
+    //         uint256 shareTokenOfPortfolio = (currentPrice * 10000) / totalValue;
+
+    //         if (shareTokenOfPortfolio > tokenInfo.targetPercentage) {
+    //             return true;
+    //         } else if (shareTokenOfPortfolio < tokenInfo.targetPercentage) {
+    //             return true;
+    //         }
+    //     }
+
+    //     return false;
+    // }
+
+
     function rebalance(uint256[] memory _tokenPrices) external onlyOwner whenNotPaused {
-        require(_tokenPrices.length == portfolio.length, "Invalid prices length");
+        require(_tokenPrices.length == portfolio.length, "!PL");
 
         uint256 totalValue = getPortfolioValue(_tokenPrices);
+        require(totalValue > 0, "tv!=0");
 
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
-            uint256 currentPrice = getTokenValueAtPrice(_tokenPrices[i], tokenInfo.token.balanceOf(address(this)));
+            uint256 currentPrice = _tokenPrices[i] * tokenInfo.token.balanceOf(address(this));
+            require(currentPrice > 0, "cp>0");
+
             uint256 shareTokenOfPortfolio = (currentPrice * 10000) / totalValue;
 
             if (shareTokenOfPortfolio > tokenInfo.targetPercentage) {
                 uint256 excessPercentage = shareTokenOfPortfolio - tokenInfo.targetPercentage;
                 uint256 calValuetoUSD = (excessPercentage * totalValue) / 10000;
-                uint256 amountOfToken = calValuetoUSD / currentPrice;
+                uint256 amountOfToken = calValuetoUSD / _tokenPrices[i];
+                require(amountOfToken > 0, "amount>0S");
                 // Execute sell on Uniswap
                 sellTokens(tokenInfo.token, amountOfToken, tokenInfo.version, tokenInfo.feeTier);
             } else if (shareTokenOfPortfolio < tokenInfo.targetPercentage) {
                 uint256 excessPercentage = tokenInfo.targetPercentage - shareTokenOfPortfolio;
                 uint256 calValuetoUSD = (excessPercentage * totalValue) / 10000;
-                uint256 amountOfToken = calValuetoUSD / currentPrice;
-                // Execute buy on Uniswap
-                buyTokens(tokenInfo.token, amountOfToken, tokenInfo.version, tokenInfo.feeTier);
+                uint256 amountOfToken = calValuetoUSD / _tokenPrices[i];
+                require(amountOfToken > 0, "amount>0B");
+                if(profitToETH > 0 || profitToWETH > 0){
+                    // Execute buy on Uniswap
+                    buyTokens(tokenInfo.token, amountOfToken, tokenInfo.version, tokenInfo.feeTier);
+                }
             }
         }
 
-        emit Rebalanced(block.timestamp);
+        // emit Rebalanced(block.timestamp);
     }
 
     function swapTokenForETH(IERC20 _token, uint256 _amountIn, string memory version, uint24 feeTier) external returns (uint256) {
-        if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v2"))) {
-                address[] memory path = new address[](2);
-                path[0] = address(_token);
-                path[1] = uniswapV2Router.WETH();
-                uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amountIn, path);
-                uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
+        if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
+            address[] memory path = new address[](2);
+            path[0] = address(_token);
+            path[1] = uniswapV2Router.WETH();
+            uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amountIn, path);
+            uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
             return swapTokenForETHV2(_token, _amountIn, amountOutMinimum, address(this));
-        } else if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v3"))) {
-             bytes memory path = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
-             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _amountIn);
+        } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
+            bytes memory path = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
+            uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _amountIn);
 
-             // Calculate the minimum amount of ETH to receive, considering slippage tolerance
+            // Calculate the minimum amount of ETH to receive, considering slippage tolerance
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
             return swapTokenForETHV3(_token, _amountIn, feeTier, amountOutMinimum, address(this));
         } else {
-            revert("Invalid Uniswap version");
+            revert("!UV");
         }
     }
 
     function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) external payable {
         // Calculate the minimum amount of tokens to receive, considering slippage tolerance
-        if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v2"))) {
+        if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
             address[] memory path = new address[](2);
             path[0] = uniswapV2Router.WETH();
             path[1] = address(_token);
             uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_ethAmount, path);
             uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
             swapETHForTokenV2(_token, _ethAmount, amountOutMinimum);
-        } else if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v3"))) {
+        } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
             bytes memory path = abi.encodePacked(uniswapV2Router.WETH(), feeTier, address(_token));
             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _ethAmount);
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
             swapETHForTokenV3(_token, _ethAmount, feeTier, amountOutMinimum);
         } else {
-            revert("Invalid Uniswap version");
+            revert("!UV");
         }
     }
 
@@ -377,9 +464,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         address[] memory path = new address[](2);
         path[0] = address(_token);
         path[1] = uniswapV2Router.WETH();
-
         _token.approve(address(uniswapV2Router), _amountIn);
-
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForETH(
             _amountIn,
             amountOutMinimum, // minimum amount of ETH to receive
@@ -391,7 +476,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
         return amounts[1];
     }
 
-    function swapETHForTokenV2(IERC20 _token, uint256 _ethAmount, uint256 amountOutMinimum) internal returns(uint256[] memory amounts){
+    function swapETHForTokenV2(IERC20 _token, uint256 _ethAmount, uint256 amountOutMinimum) internal returns (uint256[] memory amounts) {
         address[] memory path = new address[](2);
         path[0] = uniswapV2Router.WETH();
         path[1] = address(_token);
@@ -402,95 +487,102 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20 {
             address(this),
             block.timestamp
         );
+
+        return amounts;
     }
 
     function swapTokenForETHV3(IERC20 _token, uint256 _amountIn, uint24 feeTier, uint256 amountOutMinimum, address receiver) internal returns (uint256) {
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: address(_token),
-                tokenOut: uniswapV2Router.WETH(),
-                fee: feeTier, // Pool fee tier
-                recipient: receiver,
-                deadline: block.timestamp,
-                amountIn: _amountIn,
-                amountOutMinimum: amountOutMinimum, // minimum amount of ETH to receive
-                sqrtPriceLimitX96: 0
-            });
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+            tokenIn: address(_token),
+            tokenOut: uniswapV2Router.WETH(),
+            fee: feeTier, // Pool fee tier
+            recipient: receiver,
+            deadline: block.timestamp,
+            amountIn: _amountIn,
+            amountOutMinimum: amountOutMinimum, // minimum amount of ETH to receive
+            sqrtPriceLimitX96: 0
+        });
 
         _token.approve(address(uniswapV3Router), _amountIn);
         return uniswapV3Router.exactInputSingle(params);
     }
 
-    function swapETHForTokenV3(IERC20 _token, uint256 _ethAmount, uint24 feeTier, uint256 amountOutMinimum) internal returns(uint256[] memory amounts) {
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: uniswapV2Router.WETH(),
-                tokenOut: address(_token),
-                fee: feeTier, // Pool fee tier
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: _ethAmount,
-                amountOutMinimum: amountOutMinimum, // minimum amount of tokens to receive
-                sqrtPriceLimitX96: 0
-            });
-        amounts[1] = uniswapV3Router.exactInputSingle{value: _ethAmount}(params);
-        amounts[0] = _ethAmount;
+    function swapETHForTokenV3(IERC20 _token, uint256 _ethAmount, uint24 feeTier, uint256 amountOutMinimum) internal {
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+            tokenIn: uniswapV2Router.WETH(),
+            tokenOut: address(_token),
+            fee: feeTier, // Pool fee tier
+            recipient: address(this),
+            deadline: block.timestamp,
+            amountIn: _ethAmount,
+            amountOutMinimum: amountOutMinimum, // minimum amount of tokens to receive
+            sqrtPriceLimitX96: 0
+        });
+
+        
+        uniswapV3Router.exactInputSingle{value: _ethAmount}(params);
     }
 
-    function sellTokens(IERC20 _token, uint256 _amount, string memory version, uint24 feeTier) internal returns(uint256 amountOut){
-        if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v2"))) {
+    function sellTokens(IERC20 _token, uint256 _amount, string memory version, uint24 feeTier) internal returns (uint256 amountOut) {
+        require(_amount > 0, ">0");
+        require(address(_token) != address(0), "!address");
+        require(bytes(version).length > 0, "!empty");
+    
+        if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
             address[] memory path = new address[](2);
             path[0] = address(_token);
             path[1] = uniswapV2Router.WETH();
 
             uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amount, path);
+            require(expectedAmounts.length >= 2, "!EXPAM");
             uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
 
             amountOut = swapTokenForETHV2(_token, _amount, amountOutMinimum, address(this));
+            require(amountOut >= amountOutMinimum, "<amount");
             profitToETH += amountOut;
-        } else if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v3"))) {
+        } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
             bytes memory pathV3 = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(pathV3, _amount);
+            require(expectedAmountOut > 0, "min>0");
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
 
             amountOut = swapTokenForETHV3(_token, _amount, feeTier, amountOutMinimum, address(this));
-            profitToETH += amountOut;
+            require(amountOut >= amountOutMinimum, "min>0");
+            profitToWETH += amountOut;
         } else {
-            revert("Invalid Uniswap version");
+            revert("!UV");
         }
     }
 
     function buyTokens(IERC20 _token, uint256 _amountOut, string memory version, uint24 feeTier) internal {
-        if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v2"))) {
+        if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
             address[] memory path = new address[](2);
             path[0] = uniswapV2Router.WETH();
             path[1] = address(_token);
             uint256[] memory expectedAmountsIn = uniswapV2Router.getAmountsIn(_amountOut, path);
-            if(profitToETH > expectedAmountsIn[1]){
+            if (profitToETH > expectedAmountsIn[1]) {
                 uint256[] memory expectedAmountsOut = uniswapV2Router.getAmountsOut(expectedAmountsIn[1], path);
                 uint256 amountOutMinimum = (expectedAmountsOut[1] * (10000 - slippageTolerance)) / 10000;
-                swapETHForTokenV2(_token, _amountOut, amountOutMinimum);
+                swapETHForTokenV2(_token, expectedAmountsIn[1], amountOutMinimum);
             } else {
-                // here it should go to queue or calculate how much can buy token with current ETH profit in balance
                 uint256[] memory expectedAmountsOut = uniswapV2Router.getAmountsOut(profitToETH, path);
                 uint256 amountOutMinimum = (expectedAmountsOut[1] * (10000 - slippageTolerance)) / 10000;
-                swapETHForTokenV2(_token, _amountOut, amountOutMinimum);
+                swapETHForTokenV2(_token, profitToETH, amountOutMinimum);
             }
-        } else if (keccak256(abi.encodePacked(version)) == keccak256(abi.encodePacked("v3"))) {
+        } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
             bytes memory pathV3 = abi.encodePacked(uniswapV2Router.WETH(), feeTier, address(_token));
             uint256 expectedAmountIn = uniswapV3Quoter.quoteExactOutput(pathV3, _amountOut);
-            if(profitToETH > expectedAmountIn){
+            if (profitToWETH > expectedAmountIn) {
                 uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(pathV3, expectedAmountIn);
                 uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-                swapETHForTokenV3(_token, _amountOut, feeTier, amountOutMinimum);
+                swapETHForTokenV3(_token, expectedAmountIn, feeTier, amountOutMinimum);
             } else {
-                // here it should go to queue or calculate how much can buy token with current ETH profit in balance
-                uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(pathV3, profitToETH);
+                uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(pathV3, profitToWETH);
                 uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-                swapETHForTokenV3(_token, _amountOut, feeTier, amountOutMinimum);
+                swapETHForTokenV3(_token, profitToWETH, feeTier, amountOutMinimum);
             }
         } else {
-            revert("Invalid Uniswap version");
+            revert("!UV");
         }
     }
 }
