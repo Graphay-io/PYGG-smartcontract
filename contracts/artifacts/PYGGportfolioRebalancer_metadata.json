@@ -148,6 +148,37 @@
 				"anonymous": false,
 				"inputs": [
 					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "_tokens",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "targetPercentage",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "string",
+						"name": "verision",
+						"type": "string"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint24",
+						"name": "feeTier",
+						"type": "uint24"
+					}
+				],
+				"name": "AddToken",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
 						"indexed": true,
 						"internalType": "address",
 						"name": "owner",
@@ -355,19 +386,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "depositFee",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
 				"inputs": [
 					{
 						"internalType": "address",
@@ -426,35 +444,24 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "getAllTokens",
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "amountIn",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address[]",
+						"name": "path",
+						"type": "address[]"
+					}
+				],
+				"name": "getAmountsOut",
 				"outputs": [
 					{
-						"components": [
-							{
-								"internalType": "contract IERC20",
-								"name": "token",
-								"type": "address"
-							},
-							{
-								"internalType": "uint256",
-								"name": "targetPercentage",
-								"type": "uint256"
-							},
-							{
-								"internalType": "string",
-								"name": "version",
-								"type": "string"
-							},
-							{
-								"internalType": "uint24",
-								"name": "feeTier",
-								"type": "uint24"
-							}
-						],
-						"internalType": "struct PYGGportfolioRebalancer.TokenInfo[]",
-						"name": "",
-						"type": "tuple[]"
+						"internalType": "uint256[]",
+						"name": "amounts",
+						"type": "uint256[]"
 					}
 				],
 				"stateMutability": "view",
@@ -498,7 +505,7 @@
 								"type": "uint24"
 							}
 						],
-						"internalType": "struct PYGGportfolioRebalancer.FailedSwap[]",
+						"internalType": "struct FailedSwap[]",
 						"name": "",
 						"type": "tuple[]"
 					}
@@ -520,6 +527,19 @@
 						"internalType": "uint256",
 						"name": "",
 						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "getWETHaddress",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -553,46 +573,19 @@
 			},
 			{
 				"inputs": [],
+				"name": "pause",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
 				"name": "paused",
 				"outputs": [
 					{
 						"internalType": "bool",
 						"name": "",
 						"type": "bool"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"name": "portfolio",
-				"outputs": [
-					{
-						"internalType": "contract IERC20",
-						"name": "token",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "targetPercentage",
-						"type": "uint256"
-					},
-					{
-						"internalType": "string",
-						"name": "version",
-						"type": "string"
-					},
-					{
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
 					}
 				],
 				"stateMutability": "view",
@@ -622,6 +615,30 @@
 					}
 				],
 				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes",
+						"name": "path",
+						"type": "bytes"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amountIn",
+						"type": "uint256"
+					}
+				],
+				"name": "quoteExactInput",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "amounts",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "nonpayable",
 				"type": "function"
 			},
 			{
@@ -782,6 +799,79 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "contract IERC20",
+						"name": "_token",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_amountIn",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amountOutMinimum",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "receiver",
+						"type": "address"
+					}
+				],
+				"name": "swapTokenForETHV2",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "contract IERC20",
+						"name": "_token",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_amountIn",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint24",
+						"name": "feeTier",
+						"type": "uint24"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amountOutMinimum",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "receiver",
+						"type": "address"
+					}
+				],
+				"name": "swapTokenForETHV3",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "symbol",
 				"outputs": [
@@ -789,32 +879,6 @@
 						"internalType": "string",
 						"name": "",
 						"type": "string"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "totalFeesToETH",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "totalFeesToWETH",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
 					}
 				],
 				"stateMutability": "view",
@@ -939,6 +1003,41 @@
 				"type": "function"
 			},
 			{
+				"inputs": [],
+				"name": "unpause",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_token",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_targetPercentage",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "_version",
+						"type": "string"
+					},
+					{
+						"internalType": "uint24",
+						"name": "_feeTier",
+						"type": "uint24"
+					}
+				],
+				"name": "updateToken",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"inputs": [
 					{
 						"internalType": "address",
@@ -1024,15 +1123,9 @@
 			},
 			{
 				"inputs": [],
-				"name": "withdrawalFee",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
+				"name": "withdrawWholeAllInKind",
+				"outputs": [],
+				"stateMutability": "nonpayable",
 				"type": "function"
 			}
 		],
@@ -1186,7 +1279,7 @@
 		},
 		"optimizer": {
 			"enabled": true,
-			"runs": 200
+			"runs": 20
 		},
 		"remappings": []
 	},
@@ -1264,11 +1357,35 @@
 			]
 		},
 		"contracts/PYGGportfolioRebalancer.sol": {
-			"keccak256": "0x4716cac0fd835de143ba98e2005345390a139255c9a5e562232bfb52f673b3cd",
+			"keccak256": "0x060dad14800e828dd1f48268b54be6c9412e0830b87fabc92ff5360ce547b496",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://2e0e36a74e13db1e4fd535fd35479ed42a64369cd613d44edeec8a0e9e49a432",
-				"dweb:/ipfs/QmWXj49pcNUU7aUdZv92eefgFxMezbDYq27zSofv6mjqkZ"
+				"bzz-raw://4e1bb75d12ea92e657cf2226527212bd37e5344126e0dc27ba0a87029813549e",
+				"dweb:/ipfs/QmeLvESpfLXPcheJ8VkB6Jm6AKMjoC5fFTJghiVZRfiQGE"
+			]
+		},
+		"contracts/Structs.sol": {
+			"keccak256": "0x91e7d43ec2c81ab6d876f963cce28798bba632d204619e704b5ad9ce9d580b45",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://98954a33ecedbc3ce58b1847f99dccdb79eafb5ae885ddc682e553584373caf1",
+				"dweb:/ipfs/QmZGpTaGq5eHGF3vUSeJHPHCbGKtDzmcXcTV2oas898X1d"
+			]
+		},
+		"contracts/SwapOperationManager.sol": {
+			"keccak256": "0x7ac54f9ef813c13c04ce26f9783fe31c5b98268319672072836241deec167ae8",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://8c8e0a13bd7bc6f56032821e806bb1dd5449a522dd229b0ca685b14957944d54",
+				"dweb:/ipfs/QmYL7UFdzf9j1UDGuW2ewNW4JjUoWuroTn3YXEzSfJM6v9"
+			]
+		},
+		"contracts/WhiteListManager.sol": {
+			"keccak256": "0xe1fbc60e447725b244fd042f1fd28c1f90969f2bc28a690f402c4616f72aed96",
+			"license": "SEE LICENSE IN LICENSE",
+			"urls": [
+				"bzz-raw://9b4a85b30ebbfd3c008301529418c6b2226b5645a7c6e5cd4be29415d32e8ef3",
+				"dweb:/ipfs/QmeXt4AxYm2PaumcsaRwDFfvVkQRYuaBGnKFum4xz2mF6D"
 			]
 		},
 		"contracts/interface/IUniswapV2Router01.sol": {
