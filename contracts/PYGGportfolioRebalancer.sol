@@ -23,7 +23,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
     uint256 private withdrawalFee; // Fee in basis points (e.g., 100 = 1%)
     uint256 private totalFeesToETH;
     uint256 private totalFeesToWETH;
-    bool private initialedTokens = false;
+    bool public initialedTokens = false;
 
     bytes32 private constant VERSION_V2 = keccak256(abi.encodePacked("v2"));
     bytes32 private constant VERSION_V3 = keccak256(abi.encodePacked("v3"));
@@ -64,7 +64,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
                 address[] memory path = new address[](2);
                 path[0] = address(tokenInfo.token);
                 path[1] = getWETHaddress();
-                uint256[] memory expectedAmounts = getAmountsOut(tokenBalance, path);
+                uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(tokenBalance, path);
                 uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
                 totalETH += swapTokenForETHV2(tokenInfo.token, tokenBalance, amountOutMinimum, msg.sender);
             } else if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3) {
@@ -135,6 +135,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
             emit AddToken(_tokens[i], _targetPercentages[i], _versions[i], _feeTiers[i]);
         }
         require(totalPercentage == 10000, "total percentage should be 10000");
+        initialedTokens = true;
     }
 
     function updateToken(
@@ -204,13 +205,16 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * percentage) / 10000;
-            // uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000; 
-            // uint256 amountAfterFeeETH = tokenAmountToWithdraw - fee;
-            uint256 ethReceived = this.swapTokenForETH(tokenInfo.token, tokenAmountToWithdraw, tokenInfo.version, tokenInfo.feeTier);
-            if(keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))){
-                totalWETH+= ethReceived;
+            if(tokenAmountToWithdraw > 0){
+                try this.swapTokenForETH(tokenInfo.token, tokenAmountToWithdraw, tokenInfo.version, tokenInfo.feeTier) returns (uint256 ethReceived ) {
+                    if(keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))){
+                        totalWETH+= ethReceived;
+                    } else {
+                        totalETH += ethReceived;
+                    }
+                } catch {}
             } else {
-                totalETH += ethReceived;
+                continue;
             }
         }
         _burn(msg.sender, tokenAmount);
@@ -240,28 +244,23 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
 
         require(userShare > 0 && userShare <= 10000, "0&10000");
 
-
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * userShare) / 10000;
+          if(tokenAmountToWithdraw > 0){
             uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000;
             uint256 amountAfterFee = tokenAmountToWithdraw - fee;
             tokenInfo.token.transfer(msg.sender, amountAfterFee);
-            if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V2) {
-                address[] memory path = new address[](2);
-                path[0] = address(tokenInfo.token);
-                path[1] = uniswapV2Router.WETH();
-                uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(fee, path);
-                uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-                totalFeesToETH += swapTokenForETHV2(tokenInfo.token, fee, amountOutMinimum, address(this));
-            } else if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3) {
-                bytes memory path = abi.encodePacked(address(tokenInfo.token), tokenInfo.feeTier, uniswapV2Router.WETH());
-                uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, fee);
-                uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-                totalFeesToWETH += swapTokenForETHV3(tokenInfo.token, fee, tokenInfo.feeTier, amountOutMinimum, address(this));
-            } else {
-                revert("Invalid Uniswap version");
-            }
+            try this.swapTokenForETH(tokenInfo.token, fee, tokenInfo.version, tokenInfo.feeTier) returns (uint256 ethReceived) {
+                if(keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3){
+                    totalFeesToWETH += ethReceived;
+                } else {
+                    totalFeesToETH += ethReceived;
+                }
+            } catch {}
+          } else {
+            continue;
+          }
         }
 
         _burn(msg.sender, tokenAmount);
@@ -286,9 +285,9 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
         return totalValue;
     }
 
-    // function getAllTokens() external view returns (TokenInfo[] memory) {
-    //     return portfolio;
-    // }
+    function getAllTokens() external view returns (TokenInfo[] memory) {
+        return portfolio;
+    }
 
     // function needsRebalance(uint256[] memory _tokenPrices) external view returns (bool) {
     //     require(_tokenPrices.length == portfolio.length, "!PL");
@@ -310,26 +309,25 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
     //         }
     //     }
 
-    function rebalance(uint256[] memory _tokenPrices)
-        external
-        onlyOwner whenNotPaused
-    {
-        uint256 totalValue = getPortfolioValue(_tokenPrices);
-        require(totalValue > 0, "Total value must be greater than zero");
+    // function rebalance(uint256[] memory _tokenPrices)
+    //     external
+    //     onlyOwner whenNotPaused
+    // {
+    //     uint256 totalValue = getPortfolioValue(_tokenPrices);
+    //     require(totalValue > 0, "Total value must be greater than zero");
 
-        for (uint256 i = 0; i < portfolio.length; i++) {
-            TokenInfo storage tokenInfo = portfolio[i];
-            uint256 currentValue = _tokenPrices[i] * tokenInfo.token.balanceOf(address(this));
-            uint256 targetValue = (totalValue * tokenInfo.targetPercentage) / 10000;
+    //     for (uint256 i = 0; i < portfolio.length; i++) {
+    //         TokenInfo storage tokenInfo = portfolio[i];
+    //         uint256 currentValue = _tokenPrices[i] * tokenInfo.token.balanceOf(address(this));
+    //         uint256 targetValue = (totalValue * tokenInfo.targetPercentage) / 10000;
 
-            if (currentValue > targetValue) {
-                uint256 amountToSell = (currentValue - targetValue) / _tokenPrices[i];
-                sellTokens(tokenInfo.token, amountToSell, tokenInfo.version, tokenInfo.feeTier);
-            } 
-            // else if (currentValue < targetValue) {
-            //     uint256 amountTobuy = (targetValue - currentValue) / _tokenPrices[i];
-            //     buyTokens(tokenInfo.token, amountTobuy, tokenInfo.version, tokenInfo.feeTier);
-            // }
-        }
-    }
+    //         if (currentValue > targetValue) {
+    //             uint256 amountToSell = (currentValue - targetValue) / _tokenPrices[i];
+    //             sellTokens(tokenInfo.token, amountToSell, tokenInfo.version, tokenInfo.feeTier);
+    //         } else if (currentValue < targetValue) {
+    //             uint256 amountTobuy = (targetValue - currentValue) / _tokenPrices[i];
+    //             buyTokens(tokenInfo.token, amountTobuy, tokenInfo.version, tokenInfo.feeTier);
+    //         }
+    //     }
+    // }
 }

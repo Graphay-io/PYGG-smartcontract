@@ -6,6 +6,7 @@ import "./interface/IUniswapV2Router02.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "./interface/IUniswapV3Quoter.sol";
 import { FailedSwap } from "./Structs.sol";
+import "./interface/IWETH.sol";
 
 abstract contract SwapOperationManager {
     IUniswapV2Router02 public uniswapV2Router;
@@ -34,13 +35,25 @@ abstract contract SwapOperationManager {
         for (uint256 i = 0; i < failedSwaps.length; i++) {
             if (failedSwaps[i].user == user) {
                 FailedSwap memory failedSwap = failedSwaps[i];
-                try this.swapETHForToken{value: failedSwap.amount}(failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier) {
-                    removeFailedSwap(i);
-                    userFailedSwaps[user]--;
-                } catch {
-                    failedSwaps.push(FailedSwap(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier));
-                    userFailedSwaps[msg.sender]++;
-                    // emit SwapFailed(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version);
+                if(keccak256(abi.encodePacked(failedSwap.version)) == VERSION_V3){
+                    IWETH(uniswapV2Router.WETH()).deposit{value: failedSwap.amount}();
+                    try this.swapETHForToken(failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier) {
+                        removeFailedSwap(i);
+                        userFailedSwaps[user]--;
+                    } catch {
+                        failedSwaps.push(FailedSwap(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier));
+                        userFailedSwaps[msg.sender]++;
+                        // emit SwapFailed(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version);
+                    }
+                } else if (keccak256(abi.encodePacked(failedSwap.version)) == VERSION_V2) {
+                    try this.swapETHForToken{value: failedSwap.amount}(failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier) {
+                        removeFailedSwap(i);
+                        userFailedSwaps[user]--;
+                    } catch {
+                        failedSwaps.push(FailedSwap(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier));
+                        userFailedSwaps[msg.sender]++;
+                        // emit SwapFailed(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version);
+                    }
                 }
             }
         }
@@ -227,13 +240,5 @@ abstract contract SwapOperationManager {
 
     function getWETHaddress() public view returns(address) {
         return uniswapV2Router.WETH();
-    }
-
-    function getAmountsOut(uint256 amountIn, address[] memory path) public view returns(uint[] memory amounts){
-        return uniswapV2Router.getAmountsOut(amountIn, path);
-    }
-
-    function quoteExactInput(bytes memory path, uint256 amountIn) external returns(uint256 amounts){
-        return uniswapV3Quoter.quoteExactInput(path, amountIn);
     }
 }
