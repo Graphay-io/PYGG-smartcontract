@@ -116,7 +116,7 @@ abstract contract SwapOperationManager {
         }
     }
 
-    function swapTokenForETHV2(IERC20 _token, uint256 _amountIn, uint256 amountOutMinimum, address receiver) public returns (uint256) {
+    function swapTokenForETHV2(IERC20 _token, uint256 _amountIn, uint256 amountOutMinimum, address receiver) internal returns (uint256) {
         address[] memory path = new address[](2);
         path[0] = address(_token);
         path[1] = uniswapV2Router.WETH();
@@ -147,7 +147,7 @@ abstract contract SwapOperationManager {
         return amounts;
     }
 
-    function swapTokenForETHV3(IERC20 _token, uint256 _amountIn, uint24 feeTier, uint256 amountOutMinimum, address receiver) public returns (uint256) {
+    function swapTokenForETHV3(IERC20 _token, uint256 _amountIn, uint24 feeTier, uint256 amountOutMinimum, address receiver) internal returns (uint256) {
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: address(_token),
             tokenOut: uniswapV2Router.WETH(),

@@ -60,21 +60,13 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenBalance = tokenInfo.token.balanceOf(address(this));
-            if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V2) {
-                address[] memory path = new address[](2);
-                path[0] = address(tokenInfo.token);
-                path[1] = getWETHaddress();
-                uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(tokenBalance, path);
-                uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-                totalETH += swapTokenForETHV2(tokenInfo.token, tokenBalance, amountOutMinimum, msg.sender);
-            } else if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3) {
-                bytes memory path = abi.encodePacked(address(tokenInfo.token), tokenInfo.feeTier, getWETHaddress());
-                uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, tokenBalance);
-                uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-                totalWETH += swapTokenForETHV3(tokenInfo.token, tokenBalance, tokenInfo.feeTier, amountOutMinimum, msg.sender);
-            } else {
-                revert("InvalidVS");
-            }
+            try this.swapTokenForETH(tokenInfo.token, tokenBalance, tokenInfo.version, tokenInfo.feeTier) returns (uint256 ethReceived) {
+                if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V2) {
+                    totalETH += ethReceived;
+                } else if(keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3){
+                    totalWETH += ethReceived;
+                }
+            } catch  {}
         }
     }
 
@@ -198,14 +190,13 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
 
         uint256 percentage = (tokenAmount * 10000) / totalSupply();
 
-        require(percentage > 0 && percentage <= 10000, "0&10000");
         address WETH9 = uniswapV2Router.WETH();
         uint256 totalETH = 0;
         uint256 totalWETH = 0;
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * percentage) / 10000;
-            if(tokenAmountToWithdraw > 0){
+            // if(tokenAmountToWithdraw > 0){
                 try this.swapTokenForETH(tokenInfo.token, tokenAmountToWithdraw, tokenInfo.version, tokenInfo.feeTier) returns (uint256 ethReceived ) {
                     if(keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))){
                         totalWETH+= ethReceived;
@@ -213,9 +204,9 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
                         totalETH += ethReceived;
                     }
                 } catch {}
-            } else {
-                continue;
-            }
+            // } else {
+            //     continue;
+            // }
         }
         _burn(msg.sender, tokenAmount);
         if(totalWETH > 0){
@@ -242,12 +233,10 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
 
         uint256 userShare = (tokenAmount * 10000) / totalSupply();
 
-        require(userShare > 0 && userShare <= 10000, "0&10000");
-
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * userShare) / 10000;
-          if(tokenAmountToWithdraw > 0){
+        //   if(tokenAmountToWithdraw > 0){
             uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000;
             uint256 amountAfterFee = tokenAmountToWithdraw - fee;
             tokenInfo.token.transfer(msg.sender, amountAfterFee);
@@ -258,9 +247,9 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
                     totalFeesToETH += ethReceived;
                 }
             } catch {}
-          } else {
-            continue;
-          }
+        //   } else {
+        //     continue;
+        //   }
         }
 
         _burn(msg.sender, tokenAmount);
