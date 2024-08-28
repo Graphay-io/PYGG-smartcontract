@@ -60,7 +60,7 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenBalance = tokenInfo.token.balanceOf(address(this));
-            try this.swapTokenForETH(tokenInfo.token, tokenBalance, tokenInfo.version, tokenInfo.feeTier) returns (uint256 ethReceived) {
+            try this.swapTokenForETH(tokenInfo.token, tokenBalance, tokenInfo.version, tokenInfo.feeTier, address(owner())) returns (uint256 ethReceived) {
                 if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V2) {
                     totalETH += ethReceived;
                 } else if(keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3){
@@ -196,17 +196,13 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * percentage) / 10000;
-            // if(tokenAmountToWithdraw > 0){
-                try this.swapTokenForETH(tokenInfo.token, tokenAmountToWithdraw, tokenInfo.version, tokenInfo.feeTier) returns (uint256 ethReceived ) {
+                try this.swapTokenForETH(tokenInfo.token, tokenAmountToWithdraw, tokenInfo.version, tokenInfo.feeTier, address(this)) returns (uint256 ethReceived ) {
                     if(keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))){
                         totalWETH+= ethReceived;
                     } else {
                         totalETH += ethReceived;
                     }
                 } catch {}
-            // } else {
-            //     continue;
-            // }
         }
         _burn(msg.sender, tokenAmount);
         if(totalWETH > 0){
@@ -236,20 +232,16 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * userShare) / 10000;
-        //   if(tokenAmountToWithdraw > 0){
             uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000;
             uint256 amountAfterFee = tokenAmountToWithdraw - fee;
             tokenInfo.token.transfer(msg.sender, amountAfterFee);
-            try this.swapTokenForETH(tokenInfo.token, fee, tokenInfo.version, tokenInfo.feeTier) returns (uint256 ethReceived) {
+            try this.swapTokenForETH(tokenInfo.token, fee, tokenInfo.version, tokenInfo.feeTier, address(this)) returns (uint256 ethReceived) {
                 if(keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3){
                     totalFeesToWETH += ethReceived;
                 } else {
                     totalFeesToETH += ethReceived;
                 }
             } catch {}
-        //   } else {
-        //     continue;
-        //   }
         }
 
         _burn(msg.sender, tokenAmount);

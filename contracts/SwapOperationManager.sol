@@ -77,27 +77,27 @@ abstract contract SwapOperationManager {
         failedSwaps.pop();
     }
 
-    function swapTokenForETH(IERC20 _token, uint256 _amountIn, string memory version, uint24 feeTier) external returns (uint256) {
+    function swapTokenForETH(IERC20 _token, uint256 _amountIn, string memory version, uint24 feeTier, address _receiver) external returns (uint256) {
         if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
             address[] memory path = new address[](2);
             path[0] = address(_token);
             path[1] = uniswapV2Router.WETH();
             uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amountIn, path);
             uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-            return swapTokenForETHV2(_token, _amountIn, amountOutMinimum, address(this));
+            return swapTokenForETHV2(_token, _amountIn, amountOutMinimum, _receiver);
         } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
             bytes memory path = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _amountIn);
 
             // Calculate the minimum amount of ETH to receive, considering slippage tolerance
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-            return swapTokenForETHV3(_token, _amountIn, feeTier, amountOutMinimum, address(this));
+            return swapTokenForETHV3(_token, _amountIn, feeTier, amountOutMinimum, _receiver);
         } else {
             revert("!UV");
         }
     }
 
-    function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) public payable {
+    function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) external payable {
         // Calculate the minimum amount of tokens to receive, considering slippage tolerance
         if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
             address[] memory path = new address[](2);

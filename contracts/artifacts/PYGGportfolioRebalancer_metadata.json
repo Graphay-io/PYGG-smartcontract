@@ -804,6 +804,11 @@
 						"internalType": "uint24",
 						"name": "feeTier",
 						"type": "uint24"
+					},
+					{
+						"internalType": "address",
+						"name": "_receiver",
+						"type": "address"
 					}
 				],
 				"name": "swapTokenForETH",
@@ -1303,11 +1308,11 @@
 			]
 		},
 		"contracts/PYGGportfolioRebalancer.sol": {
-			"keccak256": "0x76c54e59085625fca62f2e16722e5f2373cb75b6aea9f3152212dce7ecea84f8",
+			"keccak256": "0xab19e186e6171a2cb8571b28298d07116e838073db0572c3627560964065572d",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://cd7cc4702b88c92e8706395cbc51d188ca9472411fb888eeca09bd4f4637f816",
-				"dweb:/ipfs/QmSkpP13tRrCPJFDRR2H1wjqoxkyoFKoWgKLciGThfYW8o"
+				"bzz-raw://45f6661b45deb3e31ac38a64f62967f9253c1f77f04c3c7af6deb154190ce5b3",
+				"dweb:/ipfs/QmTohfAZaWPhdbaM2hQPHSAcxaJKr15V9fGm8VzaYhq2XU"
 			]
 		},
 		"contracts/Structs.sol": {
@@ -1319,11 +1324,11 @@
 			]
 		},
 		"contracts/SwapOperationManager.sol": {
-			"keccak256": "0x0b1922bdbdf4d0e0ece614cf265ee6434b23a90337e52e818ad13386b64a9e8f",
+			"keccak256": "0xf82f0903863e739eefe0f79bfe80c81006affda0f9ffc83d5ce03c5be7017479",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://8d34648652a178910f0df3454e539ee9f10995ae1de7fcde3e2a315e76c4a530",
-				"dweb:/ipfs/QmYzjio8wAr5X3Atq7UR4i7geHKs3vuKESYviHGky6T73F"
+				"bzz-raw://49e87925299c1e48dca822e2013568f8217321b18d747b34cab9725fc7c2b453",
+				"dweb:/ipfs/QmearqaC35XUBj6hHQLUi4FUtdpfyVWRaiwmtg4JTVUj5z"
 			]
 		},
 		"contracts/WhiteListManager.sol": {
