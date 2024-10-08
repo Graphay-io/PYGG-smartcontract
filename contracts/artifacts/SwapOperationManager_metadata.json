@@ -47,30 +47,6 @@
 			{
 				"inputs": [
 					{
-						"internalType": "uint256",
-						"name": "amountIn",
-						"type": "uint256"
-					},
-					{
-						"internalType": "address[]",
-						"name": "path",
-						"type": "address[]"
-					}
-				],
-				"name": "getAmountsOut",
-				"outputs": [
-					{
-						"internalType": "uint256[]",
-						"name": "amounts",
-						"type": "uint256[]"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
 						"internalType": "address",
 						"name": "user",
 						"type": "address"
@@ -151,30 +127,6 @@
 					}
 				],
 				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "bytes",
-						"name": "path",
-						"type": "bytes"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amountIn",
-						"type": "uint256"
-					}
-				],
-				"name": "quoteExactInput",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "amounts",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "nonpayable",
 				"type": "function"
 			},
 			{
@@ -265,82 +217,14 @@
 						"internalType": "uint24",
 						"name": "feeTier",
 						"type": "uint24"
+					},
+					{
+						"internalType": "address",
+						"name": "_receiver",
+						"type": "address"
 					}
 				],
 				"name": "swapTokenForETH",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "contract IERC20",
-						"name": "_token",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "_amountIn",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amountOutMinimum",
-						"type": "uint256"
-					},
-					{
-						"internalType": "address",
-						"name": "receiver",
-						"type": "address"
-					}
-				],
-				"name": "swapTokenForETHV2",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "contract IERC20",
-						"name": "_token",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "_amountIn",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amountOutMinimum",
-						"type": "uint256"
-					},
-					{
-						"internalType": "address",
-						"name": "receiver",
-						"type": "address"
-					}
-				],
-				"name": "swapTokenForETHV3",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -431,8 +315,8 @@
 			"bytecodeHash": "ipfs"
 		},
 		"optimizer": {
-			"enabled": true,
-			"runs": 20
+			"enabled": false,
+			"runs": 200
 		},
 		"remappings": []
 	},
@@ -470,11 +354,11 @@
 			]
 		},
 		"contracts/SwapOperationManager.sol": {
-			"keccak256": "0x69a2cf063a138724fff2744ebfe4bb85001d15b9a0382f49e2b7e7fa9fab4c36",
+			"keccak256": "0xf82f0903863e739eefe0f79bfe80c81006affda0f9ffc83d5ce03c5be7017479",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://2967f259642b16974ea18f415eaf3172716e682f34e498e13ece1fbb579c570f",
-				"dweb:/ipfs/QmRRbFebfVazDMtBP6vNiBphFz8mWV3L97gxP7QV1EVHxH"
+				"bzz-raw://49e87925299c1e48dca822e2013568f8217321b18d747b34cab9725fc7c2b453",
+				"dweb:/ipfs/QmearqaC35XUBj6hHQLUi4FUtdpfyVWRaiwmtg4JTVUj5z"
 			]
 		},
 		"contracts/interface/IUniswapV2Router01.sol": {
@@ -496,6 +380,14 @@
 			"urls": [
 				"bzz-raw://063b421b33ff8c3da3efba744a3be6490b9659773b996205a6eee874a86c903a",
 				"dweb:/ipfs/QmRUdtYX7EhHRcfobahCzxr5KVD64krDrvYcUwTd1UMTL1"
+			]
+		},
+		"contracts/interface/IWETH.sol": {
+			"keccak256": "0x0b72127ded09ba8fc86c43905ade49d6f04563e101e2c539a18f1bd463d96736",
+			"license": "GPL-2.0-or-later",
+			"urls": [
+				"bzz-raw://05849a5c1f8050e3fa1a21a93428a5f19dc0e4d899e84e997c0b4b36d6e03224",
+				"dweb:/ipfs/QmejKrEVQQN3v749r9RYLmAoVs8UrBtMySb3uuKRXphjiK"
 			]
 		}
 	},
