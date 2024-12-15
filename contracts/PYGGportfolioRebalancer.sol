@@ -28,12 +28,6 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
     bytes32 private constant VERSION_V2 = keccak256(abi.encodePacked("v2"));
     bytes32 private constant VERSION_V3 = keccak256(abi.encodePacked("v3"));
 
-    // event Deposited(address indexed user, uint256 amount, uint256 shares, string version);
-    // event Withdrawn(address indexed user, uint256 amount, uint256 shares);
-    // event Rebalanced(uint256 timestamp);
-    // event Whitelisted(address indexed user, bool isWhitelisted);
-    // event SwapFailed(address indexed user, IERC20 token, uint256 amount, string version);
-    // event SlippageToleranceChanged(uint256 newSlippageTolerance);
     event AddToken(address _tokens, uint256 targetPercentage, string verision, uint24 feeTier);
 
     constructor(address _uniswapV2Router, address _uniswapV3Router, address _uniswapV3Quoter)
@@ -269,46 +263,4 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
     function getAllTokens() external view returns (TokenInfo[] memory) {
         return portfolio;
     }
-
-    // function needsRebalance(uint256[] memory _tokenPrices) external view returns (bool) {
-    //     require(_tokenPrices.length == portfolio.length, "!PL");
-
-    //     uint256 totalValue = getPortfolioValue(_tokenPrices);
-    //     require(totalValue > 0, "TV>0");
-
-    //     for (uint256 i = 0; i < portfolio.length; i++) {
-    //         TokenInfo storage tokenInfo = portfolio[i];
-    //         uint256 currentPrice = _tokenPrices[i] * tokenInfo.token.balanceOf(address(this));
-    //         require(currentPrice > 0, "CP>0");
-
-    //         uint256 shareTokenOfPortfolio = (currentPrice * 10000) / totalValue;
-
-    //         if (shareTokenOfPortfolio > tokenInfo.targetPercentage) {
-    //             return true;
-    //         } else if (shareTokenOfPortfolio < tokenInfo.targetPercentage) {
-    //             return true;
-    //         }
-    //     }
-
-    // function rebalance(uint256[] memory _tokenPrices)
-    //     external
-    //     onlyOwner whenNotPaused
-    // {
-    //     uint256 totalValue = getPortfolioValue(_tokenPrices);
-    //     require(totalValue > 0, "Total value must be greater than zero");
-
-    //     for (uint256 i = 0; i < portfolio.length; i++) {
-    //         TokenInfo storage tokenInfo = portfolio[i];
-    //         uint256 currentValue = _tokenPrices[i] * tokenInfo.token.balanceOf(address(this));
-    //         uint256 targetValue = (totalValue * tokenInfo.targetPercentage) / 10000;
-
-    //         if (currentValue > targetValue) {
-    //             uint256 amountToSell = (currentValue - targetValue) / _tokenPrices[i];
-    //             sellTokens(tokenInfo.token, amountToSell, tokenInfo.version, tokenInfo.feeTier);
-    //         } else if (currentValue < targetValue) {
-    //             uint256 amountTobuy = (targetValue - currentValue) / _tokenPrices[i];
-    //             buyTokens(tokenInfo.token, amountTobuy, tokenInfo.version, tokenInfo.feeTier);
-    //         }
-    //     }
-    // }
 }

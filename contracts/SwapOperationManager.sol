@@ -178,59 +178,6 @@ abstract contract SwapOperationManager {
         
         uniswapV3Router.exactInputSingle{value: _ethAmount}(params);
     }
-
-    // function sellTokens(IERC20 _token, uint256 _amount, string memory version, uint24 feeTier) internal returns(uint256 amountOut){
-    //     if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
-    //         address[] memory path = new address[](2);
-    //         path[0] = address(_token);
-    //         path[1] = uniswapV2Router.WETH();
-
-    //         uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amount, path);
-    //         uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-
-    //         amountOut = swapTokenForETHV2(_token, _amount, amountOutMinimum, address(this));
-    //         profitToETH += amountOut;
-    //     } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
-    //         bytes memory pathV3 = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
-    //         uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(pathV3, _amount);
-    //         uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-
-    //         amountOut = swapTokenForETHV3(_token, _amount, feeTier, amountOutMinimum, address(this));
-    //         profitToWETH += amountOut;
-    //     } else {
-    //         revert("Invalid Uniswap version");
-    //     }
-    // }
-
-    // function buyTokens(IERC20 _token, uint256 _amountOut, string memory version, uint24 feeTier) internal {
-    //    if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
-    //     address[] memory path = new address[](2);
-    //     path[0] = uniswapV2Router.WETH();
-    //     path[1] = address(_token);
-    //     uint256[] memory expectedAmountsIn = uniswapV2Router.getAmountsIn(_amountOut, path);
-        
-    //     uint256 ethToUse = (profitToETH > expectedAmountsIn[0]) ? expectedAmountsIn[0] : profitToETH;
-    //     require(ethToUse > 0, "eth to use is zero");
-
-    //     uint256[] memory expectedAmountsOut = uniswapV2Router.getAmountsOut(ethToUse, path);
-    //     uint256 amountOutMinimum = (expectedAmountsOut[1] * (10000 - slippageTolerance)) / 10000;
-        
-    //     swapETHForTokenV2(_token, ethToUse, amountOutMinimum);
-    //    } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
-    //     bytes memory pathV3 = abi.encodePacked(uniswapV2Router.WETH(), feeTier, address(_token));
-    //     uint256 expectedAmountIn = uniswapV3Quoter.quoteExactOutput(pathV3, _amountOut);
-        
-    //     uint256 ethToUse = (profitToWETH > expectedAmountIn) ? expectedAmountIn : profitToWETH;
-    //     require(ethToUse > 0, "eth to use is zero");
-    //     uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(pathV3, ethToUse);
-    //     uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-
-    //     swapETHForTokenV3(_token, ethToUse, feeTier, amountOutMinimum);
-    //   } else {
-    //     revert("Invalid Uniswap version");
-    //   }
-    // }
-
     
     function setSlippageTolerance(uint256 _slippageTolerance) external {
         require(_slippageTolerance <= 10000, "!SLP");
