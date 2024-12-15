@@ -3,6 +3,7 @@ import { PYGGportfolioRebalancer__factory } from "../typechain-types"; // Update
 
 async function main() {
   const [deployer] = await ethers.getSigners();
+  const contractAddress = "0x3405011c05e35E9ba99746e69A3Cb282777031Bf"; // Deployed contract address
 
   console.log("Deploying the contract with the account:", deployer.address);
   let uniswapV2Router;
@@ -71,69 +72,101 @@ async function main() {
       uniswapV3Router = "0xE592427A0AEce92De3Edee1F18E0157C05861564";  // Replace with actual Uniswap V3 Router address
       uniswapV3Quoter = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6";  // Replace with actual Uniswap V3 Quoter address
       addresses = [
-        "0xfd76be67fff3bac84e3d5444167bbc018f5968b6", 
-        "0x325365ed8275f6a74cac98917b7f6face8da533b", 
-        "0x824a30f2984f9013f2c8d0a29c0a3cc5fd5c0673",
-        "0x465e56cd21ad47d4d4790f17de5e0458f20c3719",
-        "0xe56c60b5f9f7b5fc70de0eb79c6ee7d00efa2625",
-        "0xbaec0e18c770993ffb1175fef493b5113cc6e32d",
-        "0x70cf99553471fe6c0d513ebfac8acc55ba02ab7b",
-        "0x56ea002b411fd5887e55329852d5777ecb170713",
-        "0x32121e0d11ecc79035045bc7466ede30816c5674",
-        "0x0CfBeD8f2248D2735203f602BE0cAe5a3131ec68",
-        "0xcaa004418eb42cdf00cb057b7c9e28f0ffd840a5",
-        "0x70BB8E6844DFB681810FD557DD741bCaF027bF94",
-        "0xbf85f94d3233ee588f0907a9147fbb59d7246b54",
-        "0x4b5ab61593a2401b1075b90c04cbcdd3f87ce011",
-        "0x7685cd3ddd862b8745b1082a6acb19e14eaa74f3",
-        "0xe8b977aa5a9303fa94818441d78575e0f697ae72",
-        "0x8c07e1dfede38b1908698988b4202a87e0d7a0f7",
-        "0x98409d8ca9629fbe01ab1b914ebf304175e384c8",
-        "0x86fef14c27c78deaeb4349fd959caa11fc5b5d75",
-        "0x9572e4c0c7834f39b5b8dff95f211d79f92d7f23",
-        "0x930b2c8ff1de619d4d6594da0ba03fdeda09a672",
-        "0xcfb2e3fd46ba5e52af6bacbd63f0848696d674f3",
-        "0xde5b7ff5b10cc5f8c95a2e2b643e3abf5179c987",
-        "0x9cb91e5451d29c84b51ffd40df0b724b639bf841",
-        "0xcd423f3ab39a11ff1d9208b7d37df56e902c932b",
-        "0x515d459555f8c1fcf2791ded819b73b60a80b8e3",
+        "0xF57e7e7C23978C3cAEC3C3548E3D615c346e79fF", 
+        "0x3506424F91fD33084466F402d5D97f05F8e3b4AF", 
+        "0x5283D291DBCF85356A21bA090E6db59121208b44",
+        "0xd1d2Eb1B1e90B638588728b4130137D262C87cae",
+        "0xF629cBd94d3791C9250152BD8dfBDF380E2a3B9c",
+        "0x767FE9EDC9E0dF98E07454847909b5E959D7ca0E",
+        "0xb131f4A55907B10d1F0A50d8ab8FA09EC342cd74",
+        "0x64Bc2cA1Be492bE7185FAA2c8835d9b824c8a194",
+        "0xCC8Fa225D80b9c7D42F96e9570156c65D6cAAa25",
+        "0x2a3bFF78B79A009976EeA096a51A948a3dC00e34",
+        "0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26",
+        "0xA0Ef786Bf476fE0810408CaBA05E536aC800ff86",
+        "0xf4d2888d29D722226FafA5d9B24F9164c092421E",
+        "0xba5BDe662c17e2aDFF1075610382B9B691296350",
+        "0xD13c7342e1ef687C5ad21b27c2b65D772cAb5C8c",
+        "0x549020a9Cb845220D66d3E9c6D9F9eF61C981102",
+        "0xF411903cbC70a74d22900a5DE66A2dda66507255",
+        "0xFca59Cd816aB1eaD66534D82bc21E7515cE441CF",
+        "0x34Be5b8C30eE4fDe069DC878989686aBE9884470",
+        "0x87d73E916D7057945c9BcD8cdd94e42A6F47f776",
+        "0x8A0a9b663693A22235B896f70a229C4A22597623",
+        "0x07150e919B4De5fD6a63DE1F9384828396f25fDC"
       ]
       feeTiers = [
-        10000, 10000, 3000, 3000, 0, 10000, 10000, 10000, 10000, 3000, 0, 3000, 3000, 3000, 3000, 10000, 0, 3000, 0, 10000, 0, 0,
-        10000, 0
+        10000,
+        10000,
+        3000,
+        3000,
+        0,
+        10000,
+        10000, 
+        10000, 
+        3000, 
+        0, 
+        3000, 
+        3000, 
+        3000, 
+        3000, 
+        10000,
+        0, 
+        3000, 
+        0, 
+        0, 
+        10000, 
+        0,
+        0
       ]
       targetPercentages = [
-        385,
-        385,
-        385,
-        385,
-        385,
-        385,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384,
-        384
+        455,
+        455,
+        455,
+        455,
+        455,
+        455,
+        455,
+        455,
+        455,
+        455,
+        455,
+        455,
+        454,
+        454,
+        454,
+        454,
+        454,
+        454,
+        454,
+        454,
+        454,
+        454
       ]
-      versions = [
-        "v3", "v3", "v3", "v3", "v3", "v3", "v3", "v3", "v3", "v3", "v3", "v3"
-      ]
+  versions = [
+    "v3", 
+    "v3", 
+    "v3", 
+    "v3", 
+    "v2", 
+    "v3", 
+    "v3", 
+    "v3", 
+    "v3", 
+    "v2", 
+    "v3", 
+  "v3", 
+  "v3",
+  "v3",
+  "v3",
+  "v2",
+  "v3",
+  "v2",
+  "v2",
+  "v3",
+  "v2",
+  "v2"
+  ]
       break;
     case "arbitrum":      
       uniswapV2Router = "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24";  // Replace with actual Uniswap V2 Router address
@@ -186,18 +219,44 @@ async function main() {
   }
 
 
-  // Deploy the contract
+//   // Deploy the contract
   const PYGGportfolioRebalancerFactory = (await ethers.getContractFactory("PYGGportfolioRebalancer")) as PYGGportfolioRebalancer__factory;
-  const pyggPortfolioRebalancer = await PYGGportfolioRebalancerFactory.deploy(uniswapV2Router, uniswapV3Router, uniswapV3Quoter);
+  // const pyggPortfolioRebalancer = await PYGGportfolioRebalancerFactory.deploy(uniswapV2Router, uniswapV3Router, uniswapV3Quoter);
 
-  const deployedAddress =  await pyggPortfolioRebalancer.getAddress();
-  console.log("PYGGportfolioRebalancer deployed to:", deployedAddress);
+//   const deployedAddress =  await pyggPortfolioRebalancer.getAddress();
+//   console.log("PYGGportfolioRebalancer deployed to:", deployedAddress);
+
+//  // Estimate gas for contract deployment (before deployment)
+//  const gasEstimate = await ethers.provider.estimateGas(
+//   await PYGGportfolioRebalancerFactory.getDeployTransaction(
+//     uniswapV2Router, 
+//     uniswapV3Router, 
+//     uniswapV3Quoter
+//   )
+// );
+
 
   // Define the data for bulkAddTokens
 
   // Call the bulkAddTokens function
-  const gasEstimate = await deployer.provider.estimateGas({
-    to: deployedAddress, // Address of the deployed contract
+
+
+  // const tx = await pyggPortfolioRebalancer.bulkAddTokens(addresses, targetPercentages, versions, feeTiers, {
+  //   gasLimit: gasEstimate * 10000n
+  // });
+  // console.log("bulkAddTokens transaction sent, waiting for confirmation...", tx.hash);
+  // await tx.wait();
+  // console.log("Tokens added successfully to the portfolio.");
+
+   // Attach to the deployed contract
+   const pyggPortfolioRebalancer = PYGGportfolioRebalancer__factory.connect(contractAddress, deployer);
+
+   // Estimate gas for the bulkAddTokens function
+  //  const gasEstimate = await pyggPortfolioRebalancer.estimateGas.bulkAddTokens(
+  //    addresses, targetPercentages, versions, feeTiers
+  //  );
+   const gasEstimate = await deployer.provider.estimateGas({
+    to: contractAddress, // Address of the deployed contract
     data: pyggPortfolioRebalancer.interface.encodeFunctionData("bulkAddTokens", [
       addresses,
       targetPercentages,
@@ -205,13 +264,14 @@ async function main() {
       feeTiers,
     ]),
   });
-
-  const tx = await pyggPortfolioRebalancer.bulkAddTokens(addresses, targetPercentages, versions, feeTiers, {
+ 
+   // Call bulkAddTokens
+   const tx = await pyggPortfolioRebalancer.bulkAddTokens(addresses, targetPercentages, versions, feeTiers, {
     gasLimit: gasEstimate * 10000n
-  });
-  console.log("bulkAddTokens transaction sent, waiting for confirmation...", tx.hash);
-  await tx.wait();
-  console.log("Tokens added successfully to the portfolio.");
+   });
+ 
+   console.log("bulkAddTokens transaction sent, waiting for confirmation...", tx.hash);
+   await tx.wait();
 }
 
 main()
