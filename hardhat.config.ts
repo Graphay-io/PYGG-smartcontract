@@ -5,7 +5,7 @@ env.config();
 
 const config: HardhatUserConfig = {
   etherscan: {
-    apiKey: "AHJFQN9UTSYFGA4BAYNDSG9QJ21W4X1WIT", // polygon
+    apiKey: "-", // polygon
     // apiKey: "YB3X78F14NZV8YW6RHTW74GC9XXZZFHZJS", // arbitrum
   },
   solidity: {
