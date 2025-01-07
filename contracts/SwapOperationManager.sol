@@ -75,47 +75,32 @@ abstract contract SwapOperationManager {
 
     function swapTokenForETH(IERC20 _token, uint256 _amountIn, Version version, uint24 feeTier, address _receiver) external returns (uint256) {
         if (version == Version.V2) {
-            address[] memory path = new address[](2);
-            path[0] = address(_token);
-            path[1] = uniswapV2Router.WETH();
-            uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amountIn, path);
-            uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-            return swapTokenForETHV2(_token, _amountIn, amountOutMinimum, _receiver);
+            return swapTokenForTokenV2(_token, _amountIn, _receiver);
         } else if (version == Version.V3) {
-            bytes memory path = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
-            uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _amountIn);
-
-            // Calculate the minimum amount of ETH to receive, considering slippage tolerance
-            uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-            return swapTokenForETHV3(_token, _amountIn, feeTier, amountOutMinimum, _receiver);
+            return swapTokenForTokenV3(_token, _amountIn, feeTier, _receiver);
         } else {
             revert("!UV");
         }
     }
 
-    function swapETHForToken(IERC20 _token, uint256 _ethAmount, Version version, uint24 feeTier) external payable {
+    function swapETHForToken(IERC20 _token, uint256 _ethAmount, Version version, uint24 feeTier, bytes path) external payable {
         // Calculate the minimum amount of tokens to receive, considering slippage tolerance
         if (version == Version.V2) {
-            address[] memory path = new address[](2);
-            path[0] = uniswapV2Router.WETH();
-            path[1] = address(_token);
-            uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_ethAmount, path);
-            uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
-            swapETHForTokenV2(_token, _ethAmount, amountOutMinimum);
+            swapETHForTokenV2(_token, _ethAmount);
         } else if (version == Version.V3) {
-            bytes memory path = abi.encodePacked(uniswapV2Router.WETH(), feeTier, address(_token));
-            uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _ethAmount);
-            uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
-            swapETHForTokenV3(_token, _ethAmount, feeTier, amountOutMinimum);
+            swapETHForTokenV3(_token, _ethAmount, feeTier);
         } else {
             revert("!UV");
         }
     }
 
-    function swapTokenForETHV2(IERC20 _token, uint256 _amountIn, uint256 amountOutMinimum, address receiver) internal returns (uint256) {
+    function swapTokenForTokenV2(IERC20 _token, uint256 _amountIn, address receiver, bytes path) internal returns (uint256) {
         address[] memory path = new address[](2);
         path[0] = address(_token);
         path[1] = uniswapV2Router.WETH();
+        uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amountIn, path);
+        uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
+
         _token.approve(address(uniswapV2Router), _amountIn);
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForETH(
             _amountIn,
@@ -128,11 +113,9 @@ abstract contract SwapOperationManager {
         return amounts[1];
     }
 
-    function swapETHForTokenV2(IERC20 _token, uint256 _ethAmount, uint256 amountOutMinimum) internal returns (uint256[] memory amounts) {
-        address[] memory path = new address[](2);
-        path[0] = uniswapV2Router.WETH();
-        path[1] = address(_token);
-
+    function swapETHForTokenV2(IERC20 _token, uint256 _ethAmount, bytes path) internal returns (uint256[] memory amounts) {
+        uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_ethAmount, path);
+        uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
         amounts = uniswapV2Router.swapExactETHForTokens{value: _ethAmount}(
             amountOutMinimum, // minimum amount of tokens to receive
             path,
@@ -143,7 +126,11 @@ abstract contract SwapOperationManager {
         return amounts;
     }
 
-    function swapTokenForETHV3(IERC20 _token, uint256 _amountIn, uint24 feeTier, uint256 amountOutMinimum, address receiver) internal returns (uint256) {
+    function swapTokenForTokenV3(IERC20 _token, uint256 _amountIn, uint24 feeTier, address receiver) internal returns (uint256) {
+        bytes memory path = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
+        uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _amountIn);
+        // Calculate the minimum amount of ETH to receive, considering slippage tolerance
+        uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: address(_token),
             tokenOut: uniswapV2Router.WETH(),
@@ -159,7 +146,11 @@ abstract contract SwapOperationManager {
         return uniswapV3Router.exactInputSingle(params);
     }
 
-    function swapETHForTokenV3(IERC20 _token, uint256 _ethAmount, uint24 feeTier, uint256 amountOutMinimum) internal {
+    function swapETHForTokenV3(IERC20 _token, uint256 _ethAmount, uint24 feeTier) internal {
+        bytes memory path = abi.encodePacked(uniswapV2Router.WETH(), feeTier, address(_token));
+        uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _ethAmount);
+        uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;
+
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: uniswapV2Router.WETH(),
             tokenOut: address(_token),
@@ -171,17 +162,11 @@ abstract contract SwapOperationManager {
             sqrtPriceLimitX96: 0
         });
 
-        
         uniswapV3Router.exactInputSingle{value: _ethAmount}(params);
     }
     
     function setSlippageTolerance(uint256 _slippageTolerance) external {
         require(_slippageTolerance <= 10000, "!SLP");
         slippageTolerance = _slippageTolerance;
-        // emit SlippageToleranceChanged(_slippageTolerance);
-    }
-
-    function getWETHaddress() public view returns(address) {
-        return uniswapV2Router.WETH();
     }
 }
