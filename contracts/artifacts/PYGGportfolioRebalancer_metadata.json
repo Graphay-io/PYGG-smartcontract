@@ -313,7 +313,13 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
+				"inputs": [
+					{
+						"internalType": "bytes",
+						"name": "_path",
+						"type": "bytes"
+					}
+				],
 				"name": "deposit",
 				"outputs": [],
 				"stateMutability": "payable",
@@ -413,65 +419,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "user",
-						"type": "address"
-					}
-				],
-				"name": "getFailedSwaps",
-				"outputs": [
-					{
-						"components": [
-							{
-								"internalType": "address",
-								"name": "user",
-								"type": "address"
-							},
-							{
-								"internalType": "contract IERC20",
-								"name": "token",
-								"type": "address"
-							},
-							{
-								"internalType": "uint256",
-								"name": "amount",
-								"type": "uint256"
-							},
-							{
-								"internalType": "enum Version",
-								"name": "version",
-								"type": "uint8"
-							},
-							{
-								"internalType": "uint24",
-								"name": "feeTier",
-								"type": "uint24"
-							}
-						],
-						"internalType": "struct FailedSwap[]",
-						"name": "",
-						"type": "tuple[]"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "getWETHaddress",
-				"outputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
 				"inputs": [],
 				"name": "initialedTokens",
 				"outputs": [
@@ -548,19 +495,6 @@
 			{
 				"inputs": [
 					{
-						"internalType": "address",
-						"name": "user",
-						"type": "address"
-					}
-				],
-				"name": "retryFailedSwaps",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
 						"internalType": "uint256",
 						"name": "_slippageTolerance",
 						"type": "uint256"
@@ -593,54 +527,26 @@
 					},
 					{
 						"internalType": "uint256",
-						"name": "_ethAmount",
-						"type": "uint256"
-					},
-					{
-						"internalType": "enum Version",
-						"name": "version",
-						"type": "uint8"
-					},
-					{
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
-					}
-				],
-				"name": "swapETHForToken",
-				"outputs": [],
-				"stateMutability": "payable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "contract IERC20",
-						"name": "_token",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
 						"name": "_amountIn",
 						"type": "uint256"
 					},
 					{
 						"internalType": "enum Version",
-						"name": "version",
+						"name": "_version",
 						"type": "uint8"
-					},
-					{
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
 					},
 					{
 						"internalType": "address",
 						"name": "_receiver",
 						"type": "address"
+					},
+					{
+						"internalType": "bytes",
+						"name": "_path",
+						"type": "bytes"
 					}
 				],
-				"name": "swapTokenForETH",
+				"name": "swapTokenForToken",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -833,6 +739,11 @@
 						"internalType": "uint256",
 						"name": "tokenAmount",
 						"type": "uint256"
+					},
+					{
+						"internalType": "bytes",
+						"name": "_path",
+						"type": "bytes"
 					}
 				],
 				"name": "withdrawToETH",
@@ -1042,11 +953,11 @@
 			]
 		},
 		"contracts/PYGGportfolioRebalancer.sol": {
-			"keccak256": "0xd61538d345945e5c71c27ab1fe8a3d59ba6b5cf8dfc165d71b36f1a484436fa4",
+			"keccak256": "0x13e598f812942e2b1384829150a577ad914a9a4779b4e7e2e04444a674a3651a",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://459989331afdee189e691de9382283af2820e77634e4d201c94d6ea27bb0c120",
-				"dweb:/ipfs/QmTU9jp9syHgUnAvx5znFa4uWJMohdjHFVLLn9Y4nWKRXU"
+				"bzz-raw://2f2eb271a0db51f70f64d9554180d845cfeaf44597614ab99799e834f764e386",
+				"dweb:/ipfs/QmRi65KzRVS15ABHWKUh8abaLLWTR7ZF389GqbYMinUKTT"
 			]
 		},
 		"contracts/Structs.sol": {
@@ -1058,11 +969,11 @@
 			]
 		},
 		"contracts/SwapOperationManager.sol": {
-			"keccak256": "0xc69b56e29f0838ad5f630b393827b096e90ff062e768f586fbe370134695215f",
+			"keccak256": "0xbecf975437fc83956ae5b191d1bad6478590350ddb55f68cea3e26257bcd8f08",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://65d805f60a2460af56498ae37770a155948094fe1277c512ab2ee08af4319172",
-				"dweb:/ipfs/QmVrzL6szYymxPXwi1mr2Vo4ZtNpLqQXfYZzL2xXPFsTRF"
+				"bzz-raw://3bbb7f50c9164436cd1bb41ec55df8e4e740528d68d489375d6fa1ffeb98e0ff",
+				"dweb:/ipfs/QmPQLGHVeSv2itXTU3cwF6UAtmm2NiW4qzjuSqGWPRKHKG"
 			]
 		},
 		"contracts/interface/IPortfolioFactory.sol": {
