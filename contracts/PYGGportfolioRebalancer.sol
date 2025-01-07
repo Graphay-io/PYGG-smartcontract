@@ -5,47 +5,72 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-import "./interface/IUniswapV2Router02.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
-import "./interface/IUniswapV3Quoter.sol";
 import "./interface/IWETH.sol";
-import { TokenInfo } from "./Structs.sol";
+import { TokenInfo, Version } from "./Structs.sol";
 import "./SwapOperationManager.sol";
 import "./WhiteListManager.sol";
 
-
-contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManager, WhiteListManager  {
-
+contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManager, WhiteListManager {
     TokenInfo[] private portfolio;
     mapping(address => uint256) public ethDepositedFailed;
 
-    uint256 private depositFee; // Fee in basis points (e.g., 100 = 1%)
-    uint256 private withdrawalFee; // Fee in basis points (e.g., 100 = 1%)
+    uint16 private depositFee;
+    uint16 private withdrawalFee;
+
     uint256 private totalFeesToETH;
     uint256 private totalFeesToWETH;
+
     bool public initialedTokens = false;
 
-    bytes32 private constant VERSION_V2 = keccak256(abi.encodePacked("v2"));
-    bytes32 private constant VERSION_V3 = keccak256(abi.encodePacked("v3"));
+    event AddToken(address _tokens, uint256 targetPercentage);
 
-    event AddToken(address _tokens, uint256 targetPercentage, string verision, uint24 feeTier);
-
-    constructor(address _uniswapV2Router, address _uniswapV3Router, address _uniswapV3Quoter)
-        Ownable(msg.sender) ERC20("PYGGETH", "PETH") SwapOperationManager(_uniswapV2Router, _uniswapV3Router, _uniswapV3Quoter)
-        WhiteListManager()
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _weth,
+        address _uniswapV2Router,
+        address _uniswapV3Router,
+        address _uniswapV3Quoter
+    )
+        Ownable(msg.sender)
+        ERC20(_name, _symbol)
+        SwapOperationManager(_uniswapV2Router, _uniswapV3Router, _uniswapV3Quoter)
+        WhiteListManager(address(owner()))
     {
         withdrawalFee = 100;
         depositFee = 100;
     }
 
+    function initializeTokens(
+        address[] calldata _tokens,
+         uint256[] calldata _targetPercentages,
+        Version[] calldata _versions,
+        uint24[] calldata _feeTiers
+    ) external onlyOwner {
+        require(!initialedTokens, "Tokens already initialized");
+        require(_tokens.length == _targetPercentages.length, "Mismatched lengths");
+
+        uint256 totalPercentage = 0;
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            require(_targetPercentages[i] <= 10000, "Invalid percentage");
+            totalPercentage += _targetPercentages[i];
+             portfolio.push(TokenInfo({
+                token: IERC20(_tokens[i]),
+                targetPercentage: _targetPercentages[i],
+                version: _versions[i],
+                feeTier: _feeTiers[i]
+            }));
+        }
+        require(totalPercentage == 10000, "Total percentage must be 10000");
+        initialedTokens = true;
+    }
+
     function pause() external onlyOwner {
         _pause();
-        emit Paused(msg.sender);
     }
-    
-    function unpause() external onlyOwner() {
+
+    function unpause() external onlyOwner {
         _unpause();
-        emit Unpaused(msg.sender);
     }
 
     function withdrawAllToETH() external onlyOwner {
@@ -54,105 +79,20 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenBalance = tokenInfo.token.balanceOf(address(this));
-            try this.swapTokenForETH(tokenInfo.token, tokenBalance, tokenInfo.version, tokenInfo.feeTier, address(owner())) returns (uint256 ethReceived) {
-                if (keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V2) {
-                    totalETH += ethReceived;
-                } else if(keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3){
-                    totalWETH += ethReceived;
-                }
-            } catch  {}
+            if (tokenBalance > 0) {
+                try this.swapTokenForETH(tokenInfo.token, tokenBalance, tokenInfo.version, tokenInfo.feeTier, address(owner())) returns (uint256 ethReceived) {
+                    if (tokenInfo.version == Version.V2) {
+                        totalETH += ethReceived;
+                    } else if(tokenInfo.version == Version.V3){
+                        totalWETH += ethReceived;
+                    }
+                } catch  {}
+            }
         }
     }
-
-    function withdrawWholeAllInKind() external onlyOwner {
-        for (uint256 i = 0; i < portfolio.length; i++) {
-            TokenInfo storage tokenInfo = portfolio[i];
-            uint256 tokenBalance = tokenInfo.token.balanceOf(address(this));
-            tokenInfo.token.transfer(msg.sender, tokenBalance);
-        }
-    }
-
-    function setFees(uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
-        require(_depositFee <= 10000, "!dfee");
-        require(_withdrawalFee <= 10000, "!wfee");
-        depositFee = _depositFee;
-        withdrawalFee = _withdrawalFee;
-    }
-
-    function withdrawFeesByOwner(address _receiverFeeAddress) external onlyOwner {
-        if(totalFeesToETH > 0){
-            (bool success, ) = _receiverFeeAddress.call{value: totalFeesToETH}("");
-            require(success, "FAILEDETH");
-            totalFeesToETH = 0;
-        }
-        if(totalFeesToWETH > 0){
-            address WETH9 = getWETHaddress();
-            IWETH(WETH9).transfer(_receiverFeeAddress, totalFeesToWETH);
-            totalFeesToWETH = 0;
-        }
-    }
-
-    function bulkAddTokens(
-        address[] calldata _tokens, 
-        uint256[] calldata _targetPercentages, 
-        string[] calldata _versions, 
-        uint24[] calldata _feeTiers
-    )    
-    external 
-    onlyOwner 
-    {
-        require(!initialedTokens, "the contract has initialized");
-        require(
-            _tokens.length == _targetPercentages.length && 
-            _tokens.length == _versions.length && 
-            _tokens.length == _feeTiers.length, 
-            "!Misslengths"
-        );
-        uint256 totalPercentage = 0;
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            require(_targetPercentages[i] <= 10000, "!percentage");
-            totalPercentage += _targetPercentages[i];
-            portfolio.push(TokenInfo({
-                token: IERC20(_tokens[i]),
-                targetPercentage: _targetPercentages[i],
-                version: _versions[i],
-                feeTier: _feeTiers[i]
-            }));
-            emit AddToken(_tokens[i], _targetPercentages[i], _versions[i], _feeTiers[i]);
-        }
-        require(totalPercentage == 10000, "total percentage should be 10000");
-        initialedTokens = true;
-    }
-
-    function updateToken(
-        address _token, 
-        uint256 _targetPercentage, 
-        string memory _version, 
-        uint24 _feeTier
-    ) 
-    external 
-    onlyOwner 
-    {
-        require(_targetPercentage <= 10000, "!P>10000");
-
-        bool tokenFound = false;
-
-        for (uint256 i = 0; i < portfolio.length; i++) {
-         if (address(portfolio[i].token) == _token) {
-            portfolio[i].targetPercentage = _targetPercentage;
-            portfolio[i].version = _version;
-            portfolio[i].feeTier = _feeTier;
-            tokenFound = true;
-            break;
-         }
-        }
-
-        require(tokenFound, "!token");
-    }
-
 
     function deposit() external payable onlyWhitelisted whenNotPaused {
-        require(msg.value > 0, "AMG");
+        require(msg.value > 0, "Deposit amount must be greater than zero");
 
         uint256 fee = (msg.value * depositFee) / 10000;
         uint256 amountAfterFee = msg.value - fee;
@@ -160,96 +100,53 @@ contract PYGGportfolioRebalancer is Ownable, Pausable, ERC20, SwapOperationManag
 
         require(amountAfterFee > 0, "Amount after fee must be greater than zero");
         _mint(msg.sender, amountAfterFee);
-        // emit Deposited(msg.sender, amountAfterFee, amountAfterFee, "N/A");
 
-        // Swap ETH to portfolio tokens
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
-            uint256 calEthAmount = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
-            require(calEthAmount <= amountAfterFee, "calETH<=amountfee");
-            // this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier);
-            try this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier) {} catch {
-                ethDepositedFailed[msg.sender] += calEthAmount;
-                failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier));
-                userFailedSwaps[msg.sender]++;
-                // emit SwapFailed(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version);
+            uint256 ethAmount = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
+            if (ethAmount > 0) {
+                try this.swapETHForToken{value: calEthAmount}(tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier) {} catch {
+                    ethDepositedFailed[msg.sender] += calEthAmount;
+                    failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, calEthAmount, tokenInfo.version, tokenInfo.feeTier));
+                    userFailedSwaps[msg.sender]++;
+                }
             }
-            // Adjust amountAfterFee to reflect the used ETH
         }
-    }
-
-    function withdrawToETH(uint256 tokenAmount) external whenNotPaused {
-        require(tokenAmount > 0, ">0");
-        require(this.balanceOf(msg.sender) >= tokenAmount, "!Insufficient");
-
-        uint256 percentage = (tokenAmount * 10000) / totalSupply();
-
-        address WETH9 = uniswapV2Router.WETH();
-        uint256 totalETH = 0;
-        uint256 totalWETH = 0;
-        for (uint256 i = 0; i < portfolio.length; i++) {
-            TokenInfo storage tokenInfo = portfolio[i];
-            uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * percentage) / 10000;
-                try this.swapTokenForETH(tokenInfo.token, tokenAmountToWithdraw, tokenInfo.version, tokenInfo.feeTier, address(this)) returns (uint256 ethReceived ) {
-                    if(keccak256(abi.encodePacked(tokenInfo.version)) == keccak256(abi.encodePacked("v3"))){
-                        totalWETH+= ethReceived;
-                    } else {
-                        totalETH += ethReceived;
-                    }
-                } catch {}
-        }
-        _burn(msg.sender, tokenAmount);
-        if(totalWETH > 0){
-            uint256 feeWETH = (totalWETH * withdrawalFee) / 10000;
-            uint256 amountAfterFeeWETH = totalWETH - feeWETH;
-            totalFeesToWETH += feeWETH;
-            IWETH(WETH9).transfer(msg.sender, amountAfterFeeWETH);
-        }
-        if(totalETH > 0){
-            uint256 feeETH = (totalETH * withdrawalFee) / 10000;
-            uint256 amountAfterFee = totalETH - feeETH;
-            totalFeesToETH += feeETH;
-            uint256 failedETHsUser = ethDepositedFailed[msg.sender];
-            uint256 totalTransferAmount = failedETHsUser + amountAfterFee;
-            (bool success, ) = msg.sender.call{value: totalTransferAmount}("");
-            require(success, "ETH transfer failed");
-        }
-        // emit Withdrawn(msg.sender, totalETH, percentage);
     }
 
     function withdraw(uint256 tokenAmount) external whenNotPaused {
-        require(tokenAmount > 0, ">0");
-        require(this.balanceOf(msg.sender) >= tokenAmount, "Insufficient");
+        require(tokenAmount > 0, "Withdraw amount must be greater than zero");
+        require(balanceOf(msg.sender) >= tokenAmount, "Insufficient balance");
 
         uint256 userShare = (tokenAmount * 10000) / totalSupply();
+        _burn(msg.sender, tokenAmount);
 
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];
             uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * userShare) / 10000;
-            uint256 fee = (tokenAmountToWithdraw * withdrawalFee) / 10000;
-            uint256 amountAfterFee = tokenAmountToWithdraw - fee;
-            tokenInfo.token.transfer(msg.sender, amountAfterFee);
-            try this.swapTokenForETH(tokenInfo.token, fee, tokenInfo.version, tokenInfo.feeTier, address(this)) returns (uint256 ethReceived) {
-                if(keccak256(abi.encodePacked(tokenInfo.version)) == VERSION_V3){
-                    totalFeesToWETH += ethReceived;
-                } else {
-                    totalFeesToETH += ethReceived;
-                }
-            } catch {}
+            if (tokenAmountToWithdraw > 0) {
+                tokenInfo.token.transfer(msg.sender, tokenAmountToWithdraw);
+            }
         }
+    }
 
-        _burn(msg.sender, tokenAmount);
-        uint256 failedETHsUser = (ethDepositedFailed[msg.sender] * userShare) / 10000;
-        uint256 totalTransferAmount = failedETHsUser;
-        if(totalTransferAmount > 0){
-            (bool success, ) = msg.sender.call{value: totalTransferAmount}("");
-            require(success, "TR");
+    function setFees(uint16 _depositFee, uint16 _withdrawalFee) external onlyOwner {
+        require(_depositFee <= 10000, "Invalid deposit fee");
+        require(_withdrawalFee <= 10000, "Invalid withdrawal fee");
+        depositFee = _depositFee;
+        withdrawalFee = _withdrawalFee;
+    }
+
+    function withdrawFeesByOwner(address _receiverFeeAddress) external onlyOwner {
+        if (totalFeesToETH > 0) {
+            (bool success, ) = _receiverFeeAddress.call{value: totalFeesToETH}("");
+            require(success, "ETH transfer failed");
+            totalFeesToETH = 0;
         }
-        // emit Withdrawn(msg.sender, userShare, userShare);
     }
 
     function getPortfolioValue(uint256[] memory _tokenPrices) public view returns (uint256) {
-        require(_tokenPrices.length == portfolio.length, "!priceslength");
+        require(_tokenPrices.length == portfolio.length, "Mismatched prices length");
         uint256 totalValue = 0;
         for (uint256 i = 0; i < portfolio.length; i++) {
             TokenInfo storage tokenInfo = portfolio[i];

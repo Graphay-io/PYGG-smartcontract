@@ -5,24 +5,21 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interface/IUniswapV2Router02.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "./interface/IUniswapV3Quoter.sol";
-import { FailedSwap } from "./Structs.sol";
+import { FailedSwap, Version } from "./Structs.sol";
 import "./interface/IWETH.sol";
 
 abstract contract SwapOperationManager {
     IUniswapV2Router02 public uniswapV2Router;
     ISwapRouter public uniswapV3Router;
     IUniswapV3Quoter public uniswapV3Quoter;
+    
     FailedSwap[] public failedSwaps;
 
     uint256 public slippageTolerance;
     uint256 public profitToETH;
     uint256 public profitToWETH;
     
-
     mapping(address => uint256) public userFailedSwaps;
-
-    bytes32 private constant VERSION_V2 = keccak256(abi.encodePacked("v2"));
-    bytes32 private constant VERSION_V3 = keccak256(abi.encodePacked("v3"));
 
     constructor(address _uniswapV2Router, address _uniswapV3Router, address _uniswapV3Quoter) {
         uniswapV2Router = IUniswapV2Router02(_uniswapV2Router);
@@ -35,7 +32,7 @@ abstract contract SwapOperationManager {
         for (uint256 i = 0; i < failedSwaps.length; i++) {
             if (failedSwaps[i].user == user) {
                 FailedSwap memory failedSwap = failedSwaps[i];
-                if(keccak256(abi.encodePacked(failedSwap.version)) == VERSION_V3){
+                if(failedSwap.version == Version.V3){
                     IWETH(uniswapV2Router.WETH()).deposit{value: failedSwap.amount}();
                     try this.swapETHForToken(failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier) {
                         removeFailedSwap(i);
@@ -45,7 +42,7 @@ abstract contract SwapOperationManager {
                         userFailedSwaps[msg.sender]++;
                         // emit SwapFailed(msg.sender, failedSwap.token, failedSwap.amount, failedSwap.version);
                     }
-                } else if (keccak256(abi.encodePacked(failedSwap.version)) == VERSION_V2) {
+                } else if (failedSwap.version == Version.V2) {
                     try this.swapETHForToken{value: failedSwap.amount}(failedSwap.token, failedSwap.amount, failedSwap.version, failedSwap.feeTier) {
                         removeFailedSwap(i);
                         userFailedSwaps[user]--;
@@ -77,8 +74,8 @@ abstract contract SwapOperationManager {
         failedSwaps.pop();
     }
 
-    function swapTokenForETH(IERC20 _token, uint256 _amountIn, string memory version, uint24 feeTier, address _receiver) external returns (uint256) {
-        if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
+    function swapTokenForETH(IERC20 _token, uint256 _amountIn, Version memory version, uint24 feeTier, address _receiver) external returns (uint256) {
+        if (keccak256(abi.encodePacked(version)) == Version.V2) {
             address[] memory path = new address[](2);
             path[0] = address(_token);
             path[1] = uniswapV2Router.WETH();
@@ -97,16 +94,16 @@ abstract contract SwapOperationManager {
         }
     }
 
-    function swapETHForToken(IERC20 _token, uint256 _ethAmount, string memory version, uint24 feeTier) external payable {
+    function swapETHForToken(IERC20 _token, uint256 _ethAmount, Version memory version, uint24 feeTier) external payable {
         // Calculate the minimum amount of tokens to receive, considering slippage tolerance
-        if (keccak256(abi.encodePacked(version)) == VERSION_V2) {
+        if (version == Version.V2) {
             address[] memory path = new address[](2);
             path[0] = uniswapV2Router.WETH();
             path[1] = address(_token);
             uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_ethAmount, path);
             uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
             swapETHForTokenV2(_token, _ethAmount, amountOutMinimum);
-        } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
+        } else if (version == Version.V3) {
             bytes memory path = abi.encodePacked(uniswapV2Router.WETH(), feeTier, address(_token));
             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _ethAmount);
             uint256 amountOutMinimum = (expectedAmountOut * (10000 - slippageTolerance)) / 10000;

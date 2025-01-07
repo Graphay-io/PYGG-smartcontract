@@ -1,6 +1,6 @@
 {
 	"compiler": {
-		"version": "0.8.26+commit.8a97fa7a"
+		"version": "0.8.20+commit.a1b79de6"
 	},
 	"language": "Solidity",
 	"output": {
@@ -8,18 +8,23 @@
 			{
 				"inputs": [
 					{
+						"internalType": "string",
+						"name": "_name",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "_symbol",
+						"type": "string"
+					},
+					{
 						"internalType": "address",
-						"name": "_uniswapV2Router",
+						"name": "_weth",
 						"type": "address"
 					},
 					{
 						"internalType": "address",
-						"name": "_uniswapV3Router",
-						"type": "address"
-					},
-					{
-						"internalType": "address",
-						"name": "_uniswapV3Quoter",
+						"name": "_oneInchRouter",
 						"type": "address"
 					}
 				],
@@ -158,18 +163,6 @@
 						"internalType": "uint256",
 						"name": "targetPercentage",
 						"type": "uint256"
-					},
-					{
-						"indexed": false,
-						"internalType": "string",
-						"name": "verision",
-						"type": "string"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
 					}
 				],
 				"name": "AddToken",
@@ -357,34 +350,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [
-					{
-						"internalType": "address[]",
-						"name": "_tokens",
-						"type": "address[]"
-					},
-					{
-						"internalType": "uint256[]",
-						"name": "_targetPercentages",
-						"type": "uint256[]"
-					},
-					{
-						"internalType": "string[]",
-						"name": "_versions",
-						"type": "string[]"
-					},
-					{
-						"internalType": "uint24[]",
-						"name": "_feeTiers",
-						"type": "uint24[]"
-					}
-				],
-				"name": "bulkAddTokens",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
 				"inputs": [],
 				"name": "decimals",
 				"outputs": [
@@ -447,16 +412,6 @@
 						"internalType": "uint256",
 						"name": "amount",
 						"type": "uint256"
-					},
-					{
-						"internalType": "string",
-						"name": "version",
-						"type": "string"
-					},
-					{
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
 					}
 				],
 				"stateMutability": "view",
@@ -477,65 +432,9 @@
 								"internalType": "uint256",
 								"name": "targetPercentage",
 								"type": "uint256"
-							},
-							{
-								"internalType": "string",
-								"name": "version",
-								"type": "string"
-							},
-							{
-								"internalType": "uint24",
-								"name": "feeTier",
-								"type": "uint24"
 							}
 						],
 						"internalType": "struct TokenInfo[]",
-						"name": "",
-						"type": "tuple[]"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "user",
-						"type": "address"
-					}
-				],
-				"name": "getFailedSwaps",
-				"outputs": [
-					{
-						"components": [
-							{
-								"internalType": "address",
-								"name": "user",
-								"type": "address"
-							},
-							{
-								"internalType": "contract IERC20",
-								"name": "token",
-								"type": "address"
-							},
-							{
-								"internalType": "uint256",
-								"name": "amount",
-								"type": "uint256"
-							},
-							{
-								"internalType": "string",
-								"name": "version",
-								"type": "string"
-							},
-							{
-								"internalType": "uint24",
-								"name": "feeTier",
-								"type": "uint24"
-							}
-						],
-						"internalType": "struct FailedSwap[]",
 						"name": "",
 						"type": "tuple[]"
 					}
@@ -557,19 +456,6 @@
 						"internalType": "uint256",
 						"name": "",
 						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "getWETHaddress",
-				"outputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -602,6 +488,24 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "address[]",
+						"name": "_tokens",
+						"type": "address[]"
+					},
+					{
+						"internalType": "uint256[]",
+						"name": "_targetPercentages",
+						"type": "uint256[]"
+					}
+				],
+				"name": "initializeTokens",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "name",
 				"outputs": [
@@ -609,6 +513,19 @@
 						"internalType": "string",
 						"name": "",
 						"type": "string"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "oneInchRouter",
+				"outputs": [
+					{
+						"internalType": "contract I1inchRouter",
+						"name": "",
+						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -649,32 +566,6 @@
 			},
 			{
 				"inputs": [],
-				"name": "profitToETH",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "profitToWETH",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
 				"name": "renounceOwnership",
 				"outputs": [],
 				"stateMutability": "nonpayable",
@@ -696,14 +587,14 @@
 			{
 				"inputs": [
 					{
-						"internalType": "uint256",
+						"internalType": "uint16",
 						"name": "_depositFee",
-						"type": "uint256"
+						"type": "uint16"
 					},
 					{
-						"internalType": "uint256",
+						"internalType": "uint16",
 						"name": "_withdrawalFee",
-						"type": "uint256"
+						"type": "uint16"
 					}
 				],
 				"name": "setFees",
@@ -766,16 +657,6 @@
 						"internalType": "uint256",
 						"name": "_ethAmount",
 						"type": "uint256"
-					},
-					{
-						"internalType": "string",
-						"name": "version",
-						"type": "string"
-					},
-					{
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
 					}
 				],
 				"name": "swapETHForToken",
@@ -796,18 +677,8 @@
 						"type": "uint256"
 					},
 					{
-						"internalType": "string",
-						"name": "version",
-						"type": "string"
-					},
-					{
-						"internalType": "uint24",
-						"name": "feeTier",
-						"type": "uint24"
-					},
-					{
 						"internalType": "address",
-						"name": "_receiver",
+						"name": "receiver",
 						"type": "address"
 					}
 				],
@@ -916,74 +787,7 @@
 			},
 			{
 				"inputs": [],
-				"name": "uniswapV2Router",
-				"outputs": [
-					{
-						"internalType": "contract IUniswapV2Router02",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "uniswapV3Quoter",
-				"outputs": [
-					{
-						"internalType": "contract IUniswapV3Quoter",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "uniswapV3Router",
-				"outputs": [
-					{
-						"internalType": "contract ISwapRouter",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
 				"name": "unpause",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "_token",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "_targetPercentage",
-						"type": "uint256"
-					},
-					{
-						"internalType": "string",
-						"name": "_version",
-						"type": "string"
-					},
-					{
-						"internalType": "uint24",
-						"name": "_feeTier",
-						"type": "uint24"
-					}
-				],
-				"name": "updateToken",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -1055,26 +859,6 @@
 					}
 				],
 				"name": "withdrawFeesByOwner",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "tokenAmount",
-						"type": "uint256"
-					}
-				],
-				"name": "withdrawToETH",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "withdrawWholeAllInKind",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -1223,7 +1007,7 @@
 		"compilationTarget": {
 			"contracts/PYGGportfolioRebalancer.sol": "PYGGportfolioRebalancer"
 		},
-		"evmVersion": "cancun",
+		"evmVersion": "shanghai",
 		"libraries": {},
 		"metadata": {
 			"bytecodeHash": "ipfs"
@@ -1291,44 +1075,28 @@
 				"dweb:/ipfs/QmXdcYj5v7zQxXFPULShHkR5p4Wa2zYuupbHnFdV3cHYtc"
 			]
 		},
-		"@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol": {
-			"keccak256": "0x3f485fb1a44e8fbeadefb5da07d66edab3cfe809f0ac4074b1e54e3eb3c4cf69",
-			"license": "GPL-2.0-or-later",
-			"urls": [
-				"bzz-raw://095ce0626b41318c772b3ebf19d548282607f6a8f3d6c41c13edfbd5370c8652",
-				"dweb:/ipfs/QmVDZfJJ89UUCE1hMyzqpkZAtQ8jUsBgZNE5AMRG7RzRFS"
-			]
-		},
-		"@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol": {
-			"keccak256": "0x9bfaf1feb32814623e627ab70f2409760b15d95f1f9b058e2b3399a8bb732975",
-			"license": "GPL-2.0-or-later",
-			"urls": [
-				"bzz-raw://a8a2c3e55965b61bcd91993d8e1d5d34b8b8a63e0fdfce87a85f6af92526fd53",
-				"dweb:/ipfs/QmQj2CSCSwqDSU4KMNWxGsN2336Cy64WgpV1X1EHXNZWxM"
-			]
-		},
 		"contracts/PYGGportfolioRebalancer.sol": {
-			"keccak256": "0xab19e186e6171a2cb8571b28298d07116e838073db0572c3627560964065572d",
+			"keccak256": "0x8e36557843254c94c35cc41683d5335886ec914caf5d0b63017f55a1dd91472e",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://45f6661b45deb3e31ac38a64f62967f9253c1f77f04c3c7af6deb154190ce5b3",
-				"dweb:/ipfs/QmTohfAZaWPhdbaM2hQPHSAcxaJKr15V9fGm8VzaYhq2XU"
+				"bzz-raw://ce264111dc9bfe77b6f2160cb704476e8651b285842933bf911e9d1764b0fb35",
+				"dweb:/ipfs/QmR27pY6bazVJc6edwksHNLLv4XtjUyhhuC6oh3Rrp9w6h"
 			]
 		},
 		"contracts/Structs.sol": {
-			"keccak256": "0x91e7d43ec2c81ab6d876f963cce28798bba632d204619e704b5ad9ce9d580b45",
+			"keccak256": "0x088504e433540876d343b8dd841fc6022214e93fe347acd6c6a5efe4349274fe",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://98954a33ecedbc3ce58b1847f99dccdb79eafb5ae885ddc682e553584373caf1",
-				"dweb:/ipfs/QmZGpTaGq5eHGF3vUSeJHPHCbGKtDzmcXcTV2oas898X1d"
+				"bzz-raw://82ad5b7ba6eb65200f0e8c24f3688121fc691f5efeaca5b8b55515a2f3f9a009",
+				"dweb:/ipfs/QmaeWWMUNdra116gKG2gMsHaYgnKkXSJiPVGzkT4Zpo3Cu"
 			]
 		},
 		"contracts/SwapOperationManager.sol": {
-			"keccak256": "0xf82f0903863e739eefe0f79bfe80c81006affda0f9ffc83d5ce03c5be7017479",
+			"keccak256": "0x2bd3dd4f1c68f772932815461d0100f585861b62bfa81947f342e7e0ba89bfbf",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://49e87925299c1e48dca822e2013568f8217321b18d747b34cab9725fc7c2b453",
-				"dweb:/ipfs/QmearqaC35XUBj6hHQLUi4FUtdpfyVWRaiwmtg4JTVUj5z"
+				"bzz-raw://3a9f02b29d6e252d67cff36f1cb0bdcd1559e798494ada87b2ee087b895523f6",
+				"dweb:/ipfs/Qmb6VXvdp9EBdVoqz92K1yEDSwzzWMstkLfJhVxTVKCYi4"
 			]
 		},
 		"contracts/WhiteListManager.sol": {
@@ -1337,27 +1105,6 @@
 			"urls": [
 				"bzz-raw://560e3479dde7b5400b8ecfb28cfee0c731abe84ce3b7916473d4c38c45ff3f69",
 				"dweb:/ipfs/Qmf6fZphJtu8EdsoSfxU358c6Us9nkjkbvTUigVxBFLQps"
-			]
-		},
-		"contracts/interface/IUniswapV2Router01.sol": {
-			"keccak256": "0x66eb4b8355b7d1fcb2e9e3ca8a0968663d9e0b194ff02c09ef0d1ae7981aa67d",
-			"urls": [
-				"bzz-raw://f8da3fe63fbfd6331ce2b7f90983734e062193a54c67ca36826f40b6ccd9c7de",
-				"dweb:/ipfs/QmcifLPYeYj3phcEqtBdz3oN2gy7EXbj7N5WUHEQ4FANsD"
-			]
-		},
-		"contracts/interface/IUniswapV2Router02.sol": {
-			"keccak256": "0x9e465376a0ef4e8d80352e20d0736cf9ea2690048bca06258ee0695dedc45cff",
-			"urls": [
-				"bzz-raw://e6e101f6aa140efc6686722aecd03a497561dd850a3678a49094f75d201958d4",
-				"dweb:/ipfs/QmdUZvwXQ92WsYNwhUNgdGCMWSh6J1B9n5hogf42CuxU2b"
-			]
-		},
-		"contracts/interface/IUniswapV3Quoter.sol": {
-			"keccak256": "0x3a4b1f927b8a151e82079db2e397b648a13eaaded333defb9506d9e30ef75d30",
-			"urls": [
-				"bzz-raw://063b421b33ff8c3da3efba744a3be6490b9659773b996205a6eee874a86c903a",
-				"dweb:/ipfs/QmRUdtYX7EhHRcfobahCzxr5KVD64krDrvYcUwTd1UMTL1"
 			]
 		},
 		"contracts/interface/IWETH.sol": {

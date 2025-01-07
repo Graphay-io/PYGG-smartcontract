@@ -14,10 +14,10 @@ abstract contract WhiteListManager {
         _;
     }
 
-    constructor() {
+    constructor(address _owner) {
         whitelist[msg.sender] = true;
         whitelistedAddresses.push(msg.sender); // Add the contract deployer to the whitelist
-        owner = msg.sender;
+        owner = _owner;
     }
 
     function setWhitelist(address _user, bool _status) external {
