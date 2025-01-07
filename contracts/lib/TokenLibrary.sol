@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { TokenInfo } from "../Structs.sol";
+import { TokenInfo, Version } from "../Structs.sol";
 
 library TokenLibrary {
-    function initializeTokens(TokenInfo[] storage portfolio, address[] calldata _tokens, uint256[] calldata _targetPercentages, string[] calldata _versions, uint24[] calldata _feeTiers) external {
+    function initializeTokens(TokenInfo[] storage portfolio, address[] calldata _tokens, uint256[] calldata _targetPercentages, Version[] calldata _versions, uint24[] calldata _feeTiers) external {
         require(_tokens.length == _targetPercentages.length && _tokens.length == _versions.length && _tokens.length == _feeTiers.length, "!Misslengths");
         uint256 totalPercentage = 0;
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -21,7 +21,7 @@ library TokenLibrary {
         require(totalPercentage == 10000, "!totalPercentage");
     }
 
-    function getPortfolio(TokenInfo[] storage portfolio) external view returns (TokenInfo[] memory) {
-        return portfolio;
-    }
+    // function getPortfolio(TokenInfo[] storage portfolio) external view returns (TokenInfo[] memory) {
+    //     return portfolio;
+    // }
 }

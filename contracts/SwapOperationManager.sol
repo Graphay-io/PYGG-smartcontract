@@ -9,17 +9,16 @@ import { FailedSwap, Version } from "./Structs.sol";
 import "./interface/IWETH.sol";
 
 abstract contract SwapOperationManager {
-    IUniswapV2Router02 public uniswapV2Router;
-    ISwapRouter public uniswapV3Router;
-    IUniswapV3Quoter public uniswapV3Quoter;
-    
+
     FailedSwap[] public failedSwaps;
 
     uint256 public slippageTolerance;
-    uint256 public profitToETH;
-    uint256 public profitToWETH;
     
     mapping(address => uint256) public userFailedSwaps;
+
+    IUniswapV2Router02 public uniswapV2Router;
+    ISwapRouter public uniswapV3Router;
+    IUniswapV3Quoter public uniswapV3Quoter;
 
     constructor(address _uniswapV2Router, address _uniswapV3Router, address _uniswapV3Quoter) {
         uniswapV2Router = IUniswapV2Router02(_uniswapV2Router);
@@ -74,15 +73,15 @@ abstract contract SwapOperationManager {
         failedSwaps.pop();
     }
 
-    function swapTokenForETH(IERC20 _token, uint256 _amountIn, Version memory version, uint24 feeTier, address _receiver) external returns (uint256) {
-        if (keccak256(abi.encodePacked(version)) == Version.V2) {
+    function swapTokenForETH(IERC20 _token, uint256 _amountIn, Version version, uint24 feeTier, address _receiver) external returns (uint256) {
+        if (version == Version.V2) {
             address[] memory path = new address[](2);
             path[0] = address(_token);
             path[1] = uniswapV2Router.WETH();
             uint256[] memory expectedAmounts = uniswapV2Router.getAmountsOut(_amountIn, path);
             uint256 amountOutMinimum = (expectedAmounts[1] * (10000 - slippageTolerance)) / 10000;
             return swapTokenForETHV2(_token, _amountIn, amountOutMinimum, _receiver);
-        } else if (keccak256(abi.encodePacked(version)) == VERSION_V3) {
+        } else if (version == Version.V3) {
             bytes memory path = abi.encodePacked(address(_token), feeTier, uniswapV2Router.WETH());
             uint256 expectedAmountOut = uniswapV3Quoter.quoteExactInput(path, _amountIn);
 
@@ -94,7 +93,7 @@ abstract contract SwapOperationManager {
         }
     }
 
-    function swapETHForToken(IERC20 _token, uint256 _ethAmount, Version memory version, uint24 feeTier) external payable {
+    function swapETHForToken(IERC20 _token, uint256 _ethAmount, Version version, uint24 feeTier) external payable {
         // Calculate the minimum amount of tokens to receive, considering slippage tolerance
         if (version == Version.V2) {
             address[] memory path = new address[](2);
