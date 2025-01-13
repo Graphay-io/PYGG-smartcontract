@@ -15,7 +15,7 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
 
     Basket[] private basket;
 
-    uint256 private totalFeesWETH;
+    uint256 public totalFeesWETH;
     uint16 public withdrawalFee;
     uint16 public depositFee;
 
@@ -140,12 +140,23 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
     }
 
     function withdrawFeesByOwner(address _receiverFeeAddress) external onlyOwner {
+        require(_receiverFeeAddress != address(0), "Invalid receiver address");
+
         if (totalFeesWETH > 0) {
-            (bool success, ) = _receiverFeeAddress.call{value: totalFeesWETH}("");
-            require(success, "transferFailed");
-            totalFeesWETH = 0;
+        // Ensure the contract has sufficient WETH balance
+        address WETH = uniswapV2Router.WETH();
+        uint256 contractWETHBalance = ERC20(WETH).balanceOf(address(this));
+        require(contractWETHBalance >= totalFeesWETH, "Insufficient WETH balance");
+
+        // Transfer WETH to the receiver address
+        bool success = ERC20(WETH).transfer(_receiverFeeAddress, totalFeesWETH);
+        require(success, "WETH transfer failed");
+
+        // Reset the fee tracker
+        totalFeesWETH = 0;
         }
     }
+
 
     function getBasket() external view returns (Basket[] memory) {
         return basket;

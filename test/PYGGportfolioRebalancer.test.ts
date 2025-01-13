@@ -193,5 +193,80 @@ describe("PYGGportfolioManagement", function () {
 
       expect(balancePYYGTokenBefore.sub(balancePYYGShareTokenAfter)).to.equal(balancePYYGTokenBefore); // Give whole ShareToken back
     });
+
+    it("Should allow withdrawal in kind portfolio", async function () {
+      const amountIn = ethers.parseEther("10");
+
+      // Approve the portfolio to spend WETH tokens
+      await (WETH as any).connect(owner).approve(await PYGGportfolioManagement.getAddress(), amountIn);
+
+      // Deposit WETH into the portfolio
+      const depositTx = await PYGGportfolioManagement.deposit({
+        amountIn: amountIn,
+        directions: [
+          {
+            path: defaultAbiCoder.encode(["address[]"], [[await WETH.getAddress(), await TSTToken.getAddress()]]),
+            version: 0 // Assuming Uniswap V2
+          }
+        ]
+      });
+      await depositTx.wait();
+
+      const balancePYYGTokenBefore = BigNumber.from(await PYGGportfolioManagement.balanceOf(await owner.getAddress()));
+
+      // Withdraw WETH from the portfolio
+      const withdrawTx = await PYGGportfolioManagement.withdrawInKind(balancePYYGTokenBefore.toBigInt(), {
+        amountIn: amountIn,
+        directions: [
+          {
+            path: defaultAbiCoder.encode(["address[]"], [[await TSTToken.getAddress(), await WETH.getAddress()]]),
+            version: 0 // Assuming Uniswap V2
+          }
+        ]
+      });
+      await withdrawTx.wait();
+      
+      const balancePYYGShareTokenAfter = BigNumber.from(await PYGGportfolioManagement.balanceOf(await owner.getAddress()));
+
+      expect(balancePYYGTokenBefore.sub(balancePYYGShareTokenAfter)).to.equal(balancePYYGTokenBefore); // Give whole ShareToken back
+    });
   });
+
+  describe("Withdraw Fees by Owner", function () {
+    it("Should allow the owner to withdraw fees", async function () {
+      const amountIn = ethers.parseEther("10");
+  
+      await (WETH as any).connect(owner).approve(await PYGGportfolioManagement.getAddress(), amountIn);
+  
+      // Deposit WETH into the portfolio to generate fees
+      const depositTx = await PYGGportfolioManagement.deposit({
+        directions: [
+          {
+            path: defaultAbiCoder.encode(["address[]"], [[await WETH.getAddress(), await TSTToken.getAddress()]]),
+            version: 0 // Assuming Uniswap V2
+          }
+        ],
+        amountIn: amountIn,
+      });
+      await depositTx.wait();
+  
+      // Check the total fees collected
+      const totalFeesWETHBefore = await PYGGportfolioManagement.totalFeesWETH();
+      expect(totalFeesWETHBefore).to.be.gt(0);
+  
+      // Withdraw fees by owner
+      const receiverFeeAddress = await owner.getAddress();
+      const withdrawFeesTx = await PYGGportfolioManagement.withdrawFeesByOwner(receiverFeeAddress);
+      await withdrawFeesTx.wait();
+  
+      // Check the total fees after withdrawal
+      const totalFeesWETHAfter = await PYGGportfolioManagement.totalFeesWETH();
+      expect(totalFeesWETHAfter).to.equal(0);
+  
+      // Check the balance of the receiver address
+      const receiverBalance = await ethers.provider.getBalance(receiverFeeAddress);
+      expect(receiverBalance).to.be.gt(totalFeesWETHBefore);
+    });
+  });
+
 });
