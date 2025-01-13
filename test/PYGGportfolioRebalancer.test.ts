@@ -1,216 +1,197 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Contract, Signer } from "ethers";
-import { MockUniswapV2Router, MockUniswapV3Router, MockUniswapV3Quoter, PortfolioFactory, PYGGportfolioRebalancer } from "../typechain-types";
+import { BigNumber } from "@ethersproject/bignumber";
+import { defaultAbiCoder } from "@ethersproject/abi";
+import { Contract, ContractFactory, Signer } from "ethers";
+import { PortfolioFactory } from "../typechain-types";
+import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
+import UniswapV2Router02 from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
+import IUniswapV2Pair from "@uniswap/v2-periphery/build/IUniswapV2Pair.json";
 
-describe("PortfolioFactory", function () {
-  let portfolioFactory: PortfolioFactory;
-  let pyggPortfolioRebalancer: PYGGportfolioRebalancer;
-  let mockUniswapV2Router: MockUniswapV2Router;
-  let mockUniswapV3Router: MockUniswapV3Router;
-  let mockUniswapV3Quoter: MockUniswapV3Quoter;
+describe("PYGGportfolioManagement", function () {
+  let PortfolioFactory: PortfolioFactory;
+  let PYGGportfolioManagement: Contract;
+  let MockUniswapV3Router: Contract;
+  let MockUniswapV3Quoter: Contract;
+  let WETH: Contract;
+  let TSTToken: Contract;
   let owner: Signer;
-  let addr1: Signer;
-  let addr2: Signer;
+  let liquidityProvider: Signer;
 
   beforeEach(async function () {
-    [owner, addr1, addr2] = await ethers.getSigners();
+    [owner, liquidityProvider] = await ethers.getSigners();
 
-    const MockUniswapV2RouterFactory = await ethers.getContractFactory("MockUniswapV2Router");
-    mockUniswapV2Router = (await MockUniswapV2RouterFactory.deploy()) as MockUniswapV2Router;
+    // Deploy mock Uniswap contracts
+    const uniswapV2Factory = new ContractFactory(
+      UniswapV2Factory.abi,
+      UniswapV2Factory.bytecode,
+      liquidityProvider)
+    const factory = (await uniswapV2Factory.connect(liquidityProvider).deploy(await owner.getAddress())) as unknown as Contract;
+    
+    // Deploy TEST token
+    const MockTESTFactory = await ethers.getContractFactory("MockTESTToken");
+    TSTToken = await MockTESTFactory.connect(liquidityProvider).deploy("test token 1", "TST") as unknown as Contract;
 
+    // Deploy WETH token
+    const WETHFactory = await ethers.getContractFactory("MockWETH");
+    WETH = await WETHFactory.connect(liquidityProvider).deploy() as unknown as Contract;
+
+    const txCreatePair = await factory.createPair(TSTToken, WETH);
+    txCreatePair.wait();
+
+    const pairAddress = await factory.getPair(TSTToken, WETH);
+    const pair = new Contract(pairAddress, IUniswapV2Pair.abi, owner);
+    
+    // Deploy UniswapV2Router contract
+    const UniswapV2Router = await ethers.getContractFactory(
+      UniswapV2Router02.abi,
+      UniswapV2Router02.bytecode
+    );
+    const router = await UniswapV2Router.connect(liquidityProvider).deploy(await factory.getAddress(), await WETH.getAddress()) as unknown as Contract;
+    const routerAddress = await router.getAddress();
+
+    const MaxUint256 =
+    "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
+    const approveTx1 = await TSTToken.approve(routerAddress, MaxUint256);
+    await approveTx1.wait();
+    const approvalTx2 = await WETH.approve(routerAddress, MaxUint256);
+    await approvalTx2.wait();
+
+    const token0Amount = ethers.parseUnits("100");
+    const token1Amount = ethers.parseUnits("100");
+
+    const lpTokenBalanceBefore = await pair.balanceOf(await owner.getAddress());
+    const deadline = Math.floor(Date.now() / 1000) + 10 * 60;
+
+    const addLiquidityTx = await router
+    .addLiquidity(
+      await TSTToken.getAddress(),
+      await WETH.getAddress(),
+      token0Amount,
+      token1Amount,
+      0,
+      0,
+      owner,
+      deadline
+    );
+    await addLiquidityTx.wait();
+
+    // Deploy mock UniswapV3 contracts
     const MockUniswapV3RouterFactory = await ethers.getContractFactory("MockUniswapV3Router");
-    mockUniswapV3Router = (await MockUniswapV3RouterFactory.deploy()) as unknown as MockUniswapV3Router;
+    MockUniswapV3Router = await MockUniswapV3RouterFactory.deploy() as unknown as Contract;
 
+    // Deploy mock UniswapV3Quoter contract
     const MockUniswapV3QuoterFactory = await ethers.getContractFactory("MockUniswapV3Quoter");
-    mockUniswapV3Quoter = (await MockUniswapV3QuoterFactory.deploy()) as MockUniswapV3Quoter;
+    MockUniswapV3Quoter = await MockUniswapV3QuoterFactory.deploy() as unknown as Contract;
 
-    const PYGGportfolioRebalancerFactory = await ethers.getContractFactory("PYGGportfolioRebalancer");
-    pyggPortfolioRebalancer = (await PYGGportfolioRebalancerFactory.deploy(
-      await mockUniswapV2Router.getAddress(),
-      await mockUniswapV3Router.getAddress(),
-      await mockUniswapV3Quoter.getAddress()
-    )) as PYGGportfolioRebalancer;
-
+    // Deploy PortfolioFactory contract
     const PortfolioFactoryFactory = await ethers.getContractFactory("PortfolioFactory");
-    portfolioFactory = (await PortfolioFactoryFactory.deploy()) as PortfolioFactory;
-  });
+    PortfolioFactory = await PortfolioFactoryFactory.deploy(await router.getAddress(), await MockUniswapV3Router.getAddress(), await MockUniswapV3Quoter.getAddress()) as PortfolioFactory;
+    const TSTTokenAddr = await TSTToken.getAddress();
+  
+    (WETH as any).connect(liquidityProvider).transfer(await owner.getAddress(), ethers.parseEther("10"));
+    let reserve = await pair.getReserves();
 
-  it("should create a new portfolio", async function () {
-    const tokens = [await addr1.getAddress(), await addr2.getAddress()];
-    const targetPercentages = [5000, 5000];
-    const versions = ["v2", "v3"];
-    const feeTiers = [3000, 10000];
+    // Create a new portfolio
+    const name = "DEFI";
+    const symbol = "DEFI";
+    const withdrawalFee = 100;
+    const depositFee = 100;
+    const tokens = [TSTTokenAddr];
+    const targetPercentages = [10000];
+    const tx = await PortfolioFactory.connect(owner).createPortfolio(name, symbol, withdrawalFee, depositFee, tokens, targetPercentages);
+    await tx.wait();
 
-    await portfolioFactory.createPortfolio(
-      "Test Portfolio",
-      "TPF",
-      100,
-      tokens,
-      targetPercentages,
-      versions,
-      feeTiers,
-      await mockUniswapV2Router.getAddress(),
-      await mockUniswapV3Router.getAddress(),
-      await mockUniswapV3Quoter.getAddress()
-    );
-
-    const portfolios = await portfolioFactory.getPortfolios(await owner.getAddress());
-    expect(portfolios.length).to.equal(1);
-    expect(portfolios[0].name).to.equal("Test Portfolio");
-    expect(portfolios[0].symbol).to.equal("TPF");
-    expect(portfolios[0].fee).to.equal(100);
-    expect(portfolios[0].tokens).to.deep.equal(tokens);
-  });
-
-  it("should initialize tokens in the new portfolio", async function () {
-    const tokens = [await addr1.getAddress(), await addr2.getAddress()];
-    const targetPercentages = [5000, 5000];
-    const versions = ["v2", "v3"];
-    const feeTiers = [3000, 10000];
-
-    await portfolioFactory.createPortfolio(
-      "Test Portfolio",
-      "TPF",
-      100,
-      tokens,
-      targetPercentages,
-      versions,
-      feeTiers,
-      mockUniswapV2Router.getAddress(),
-      mockUniswapV3Router.getAddress(),
-      mockUniswapV3Quoter.getAddress()
-    );
-
-    const portfolios = await portfolioFactory.getPortfolios(await owner.getAddress());
+    // Get the deployed portfolio address
+    const portfolios = await PortfolioFactory.connect(owner).getPortfolios(await owner.getAddress());
     const portfolioAddress = portfolios[0].portfolioAddress;
-    const portfolio = await ethers.getContractAt("PYGGportfolioRebalancer", portfolioAddress) as PYGGportfolioRebalancer;
 
-    const portfolioTokens = await portfolio.getAllTokens();
-    expect(portfolioTokens.length).to.equal(2);
-    expect(portfolioTokens[0].token).to.equal(tokens[0]);
-    expect(portfolioTokens[1].token).to.equal(tokens[1]);
+    // Get the deployed PYGGportfolioManagement contract
+    PYGGportfolioManagement = await ethers.getContractAt("PYGGportfolioManagement", portfolioAddress) as unknown as Contract;
+    await PYGGportfolioManagement.setSlippageTolerance(500);
   });
 
-  it("should allow deposit and withdraw", async function () {
-    const tokens = [await addr1.getAddress(), await addr2.getAddress()];
-    const targetPercentages = [5000, 5000];
-    const versions = ["v2", "v3"];
-    const feeTiers = [3000, 10000];
+  describe("Initialization", function () {
+    it("Should initialize the portfolio with the correct values", async function () {
+      const name = await PYGGportfolioManagement.name();
+      const symbol = await PYGGportfolioManagement.symbol();
+      const withdrawalFee = await PYGGportfolioManagement.withdrawalFee();
+      const depositFee = await PYGGportfolioManagement.depositFee();
+      const tokens = await PYGGportfolioManagement.getBasket();
 
-    await portfolioFactory.createPortfolio(
-      "Test Portfolio",
-      "TPF",
-      100,
-      tokens,
-      targetPercentages,
-      versions,
-      feeTiers,
-      mockUniswapV2Router.getAddress(),
-      mockUniswapV3Router.getAddress(),
-      mockUniswapV3Quoter.getAddress()
-    );
-
-    const portfolios = await portfolioFactory.getPortfolios(await owner.getAddress());
-    const portfolioAddress = portfolios[0].portfolioAddress;
-    const portfolio = await ethers.getContractAt("PYGGportfolioRebalancer", portfolioAddress) as PYGGportfolioRebalancer;
-
-    await portfolio.deposit({ value: ethers.parseEther("1") });
-    expect(await portfolio.balanceOf(await owner.getAddress())).to.equal(ethers.utils.parseEther("0.99"));
-
-    await portfolio.withdraw(ethers.parseEther("0.99"));
-    expect(await portfolio.balanceOf(await owner.getAddress())).to.equal(0);
+      expect(name).to.equal("DEFI");
+      expect(symbol).to.equal("DEFI");
+      expect(withdrawalFee).to.equal(100);
+      expect(depositFee).to.equal(100);
+      expect(tokens.length).to.equal(1);
+      expect(tokens[0].token).to.equal(await TSTToken.getAddress());
+      expect(tokens[0].targetPercentage).to.equal(10000);
+    });
   });
 
-  it("should allow rebalancing by whitelisted users", async function () {
-    const tokens = [await addr1.getAddress(), await addr2.getAddress()];
-    const targetPercentages = [5000, 5000];
-    const versions = ["v2", "v3"];
-    const feeTiers = [3000, 10000];
+  describe("Deposit", function () {
+    it("Should allow deposit of WETH", async function () {
+      const amountIn = ethers.parseEther("10");
 
-    await portfolioFactory.createPortfolio(
-      "Test Portfolio",
-      "TPF",
-      100,
-      tokens,
-      targetPercentages,
-      versions,
-      feeTiers,
-      mockUniswapV2Router.getAddress(),
-      mockUniswapV3Router.getAddress(),
-      mockUniswapV3Quoter.getAddress()
-    );
+      // Approve the portfolio to spend WETH tokens
+      await (WETH as any).connect(owner).approve(await PYGGportfolioManagement.getAddress(), amountIn);
+      const wethAddress = await WETH.getAddress();
+      const tstTokenAddress = await TSTToken.getAddress();
 
-    const portfolios = await portfolioFactory.getPortfolios(await owner.getAddress());
-    const portfolioAddress = portfolios[0].portfolioAddress;
-    const portfolio = await ethers.getContractAt("PYGGportfolioRebalancer", portfolioAddress) as PYGGportfolioRebalancer;
+      // Deposit WETH into the portfolio
+      const depositTx = await PYGGportfolioManagement.deposit({
+        directions: [
+          {
+            path: defaultAbiCoder.encode(["address[]"], [[wethAddress, tstTokenAddress]]),
+            version: 0 // Assuming Uniswap V2
+          }
+        ],
+        amountIn: amountIn,
+      });
+      await depositTx.wait();
 
-    await portfolio.setWhitelist(await addr1.getAddress(), true);
-    // await portfolio.connect(addr1).rebalance();
+      const balance = await PYGGportfolioManagement.balanceOf(await owner.getAddress());
+      expect(balance).to.equal(BigNumber.from(amountIn).mul(9900).div(10000)); // 1% deposit fee
+    });
   });
 
-  it("should allow pausing and unpausing by the owner", async function () {
-    const tokens = [await addr1.getAddress(), await addr2.getAddress()];
-    const targetPercentages = [5000, 5000];
-    const versions = ["v2", "v3"];
-    const feeTiers = [3000, 10000];
+  describe("Withdraw", function () {
+    it("Should allow withdrawal of WETH", async function () {
+      const amountIn = ethers.parseEther("10");
 
-    await portfolioFactory.createPortfolio(
-      "Test Portfolio",
-      "TPF",
-      100,
-      tokens,
-      targetPercentages,
-      versions,
-      feeTiers,
-      mockUniswapV2Router.getAddress(),
-      mockUniswapV3Router.getAddress(),
-      mockUniswapV3Quoter.getAddress()
-    );
+      // Approve the portfolio to spend WETH tokens
+      await (WETH as any).connect(owner).approve(await PYGGportfolioManagement.getAddress(), amountIn);
 
-    const portfolios = await portfolioFactory.getPortfolios(await owner.getAddress());
-    const portfolioAddress = portfolios[0].portfolioAddress;
-    const portfolio = await ethers.getContractAt("PYGGportfolioRebalancer", portfolioAddress) as PYGGportfolioRebalancer;
+      // Deposit WETH into the portfolio
+      const depositTx = await PYGGportfolioManagement.deposit({
+        amountIn: amountIn,
+        directions: [
+          {
+            path: defaultAbiCoder.encode(["address[]"], [[await WETH.getAddress(), await TSTToken.getAddress()]]),
+            version: 0 // Assuming Uniswap V2
+          }
+        ]
+      });
+      await depositTx.wait();
 
-    await portfolio.pause();
-    await expect(portfolio.deposit({ value: ethers.parseEther("1") })).to.be.revertedWith("Pausable: paused");
+      const balancePYYGTokenBefore = BigNumber.from(await PYGGportfolioManagement.balanceOf(await owner.getAddress()));
 
-    await portfolio.unpause();
-    await portfolio.deposit({ value: ethers.parseEther("1") });
-  });
+      // Withdraw WETH from the portfolio
+      const withdrawTx = await PYGGportfolioManagement.withdrawToETH(balancePYYGTokenBefore.toBigInt(), {
+        amountIn: amountIn,
+        directions: [
+          {
+            path: defaultAbiCoder.encode(["address[]"], [[await TSTToken.getAddress(), await WETH.getAddress()]]),
+            version: 0 // Assuming Uniswap V2
+          }
+        ]
+      });
+      await withdrawTx.wait();
+      
+      const balancePYYGShareTokenAfter = BigNumber.from(await PYGGportfolioManagement.balanceOf(await owner.getAddress()));
 
-  it("should allow setting deposit and withdrawal fees by the owner", async function () {
-    const tokens = [await addr1.getAddress(), await addr2.getAddress()];
-    const targetPercentages = [5000, 5000];
-    const versions = ["v2", "v3"];
-    const feeTiers = [3000, 10000];
-
-    await portfolioFactory.createPortfolio(
-      "Test Portfolio",
-      "TPF",
-      100,
-      tokens,
-      targetPercentages,
-      versions,
-      feeTiers,
-      mockUniswapV2Router.getAddress(),
-      mockUniswapV3Router.getAddress(),
-      mockUniswapV3Quoter.getAddress()
-    );
-
-    const portfolios = await portfolioFactory.getPortfolios(await owner.getAddress());
-    const portfolioAddress = portfolios[0].portfolioAddress;
-    const portfolio = await ethers.getContractAt("PYGGportfolioRebalancer", portfolioAddress) as PYGGportfolioRebalancer;
-
-    const withdrawFee = 200;
-    const depositFee = 200;
-
-    await portfolio.setFees(depositFee, withdrawFee);
-
-    await portfolio.deposit({ value: ethers.parseEther("1") });
-    expect(await portfolio.balanceOf(await owner.getAddress())).to.equal(ethers.utils.parseEther("0.98"));
-
-    await portfolio.withdraw(ethers.parseEther("0.98"));
-    expect(await portfolio.balanceOf(await owner.getAddress())).to.equal(0);
+      expect(balancePYYGTokenBefore.sub(balancePYYGShareTokenAfter)).to.equal(balancePYYGTokenBefore); // Give whole ShareToken back
+    });
   });
 });

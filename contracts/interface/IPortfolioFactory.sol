@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-import { Version, Portfolio } from "../Structs.sol";
+pragma solidity ^0.8.28;
+
+import { Version, Portfolio, Basket } from "../Structs.sol";
 
 interface IPortfolioFactory {
 
-    event PortfolioCreated(address indexed owner, string name, string symbol, address[] tokens, address portfolioAddress);
+    event PortfolioCreated(address indexed owner, string name, string symbol, address[] tokens, uint256[] targetPercentage, address portfolioAddress);
 
     function createPortfolio(
         string memory _name,

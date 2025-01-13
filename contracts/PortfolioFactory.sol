@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import "./PYGGportfolioManagement.sol";
 import "./interface/IPortfolioFactory.sol";
-import { Portfolio } from "./Structs.sol";
+import { Portfolio, Basket } from "./Structs.sol";
 
 contract PortfolioFactory is IPortfolioFactory {
 
     mapping(address => Portfolio[]) public portfolios;
 
-    address private uniswapV2Router;
-    address private uniswapV3Router;
-    address private uniswapV3Quoter;
+    address public uniswapV2Router;
+    address public uniswapV3Router;
+    address public uniswapV3Quoter;
 
     constructor(address _uniswapV2Router, address _uniswapV3Router, address _uniswapV3Quoter) {
         uniswapV2Router = _uniswapV2Router;
@@ -48,7 +48,7 @@ contract PortfolioFactory is IPortfolioFactory {
             portfolioAddress: address(newPortfolio)
         }));
 
-        emit PortfolioCreated(msg.sender, _name, _symbol, _tokens, address(newPortfolio));
+        emit PortfolioCreated(msg.sender, _name, _symbol, _tokens, _targetPercentages, address(newPortfolio));
     }
 
     function getPortfolios(address _owner) external view override returns (Portfolio[] memory) {

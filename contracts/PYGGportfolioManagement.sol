@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interface/IWETH.sol";
 import "./interface/IPortfolioFactory.sol";
-import { TokenInfo, Version, SwapPath } from "./Structs.sol";
+import { Basket, Version, SwapPath } from "./Structs.sol";
 import "./SwapOperationManager.sol";
+import "./lib/FeeCalculation.sol";
 
 contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
-    
-    TokenInfo[] private tokens;
+    using FeeCalculation for uint256;
+
+    Basket[] private basket;
 
     uint256 private totalFeesWETH;
     uint16 public withdrawalFee;
@@ -23,7 +25,9 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
 
     address private factory;
 
-    event AddToken(address _tokens, uint256 targetPercentage);
+    event Deposit(SwapPath _swapath, address _sender);
+    event withdrawalToETH(uint256 _tokenAmount, SwapPath _swapath, address _receiver);
+    event withdrawalInKind(uint256 _tokenAmount, address _receiver);
 
     constructor(
         string memory _name,
@@ -37,6 +41,7 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
         SwapOperationManager(_uniswapV2Router, _uniswapV3Router, _uniswapV3Quoter)
     {
         factory = msg.sender;
+        setVaultContract(address(this));
     }
 
     function initializeTokens(
@@ -53,7 +58,7 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
         for (uint256 i = 0; i < _tokens.length; i++) {
             require(_targetPercentages[i] <= 10000, "InvalidPercentage");
             totalPercentage += _targetPercentages[i];
-             tokens.push(TokenInfo({
+            basket.push(Basket({
                 token: IERC20(_tokens[i]),
                 targetPercentage: _targetPercentages[i]
             }));
@@ -62,73 +67,76 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
         initialedTokens = true;
     }
 
-    function deposit(bytes memory _path) external payable {
-        (SwapPath memory _swapath) = abi.decode(_path, (SwapPath));
+    function deposit(SwapPath calldata _swapath) external {
+        require(initialedTokens, "initialize needed");
         require(_swapath.amountIn > 0, "!>0");
-
-        uint256 fee = (_swapath.amountIn * depositFee) / 10000;
-        uint256 amountAfterFee = _swapath.amountIn - fee;
+        
+        (uint256 amountAfterFee, uint256 fee) = _swapath.amountIn.calculateAmountAfterFee(depositFee);
         totalFeesWETH += fee;
 
         require(amountAfterFee > 0, "!>0");
+        TransferHelper.safeTransferFrom(address(uniswapV2Router.WETH()), msg.sender, address(this), _swapath.amountIn);
+        TransferHelper.safeApprove(address(uniswapV2Router.WETH()), address(uniswapV3Router), _swapath.amountIn);
+        TransferHelper.safeApprove(address(uniswapV2Router.WETH()), address(uniswapV2Router), _swapath.amountIn);
+        
         _mint(msg.sender, amountAfterFee);
 
-        for (uint256 i = 0; i < tokens.length; i++) {
-            TokenInfo storage tokenInfo = tokens[i];
-            uint256 ethAmount = (amountAfterFee * tokenInfo.targetPercentage) / 10000;
+        for (uint256 i = 0; i < basket.length; i++) {
+            Basket storage _basket = basket[i];
+            uint256 ethAmount = (amountAfterFee * _basket.targetPercentage) / 10000;
             require(ethAmount <= amountAfterFee, "!ethAmount<=amountfee");
             if (ethAmount > 0) {
-                try this.swapTokenForToken(tokenInfo.token, ethAmount, _swapath.version, msg.sender, _swapath.path) {} catch {
-                    ethDepositedFailed[msg.sender] += ethAmount;
-                    failedSwaps.push(FailedSwap(msg.sender, tokenInfo.token, ethAmount));
-                    userFailedSwaps[msg.sender]++;
-                }
+                this.swapTokenForToken(_basket.token, ethAmount, _swapath.directions[i].version, address(this), _swapath.directions[i].path);
             }
         }
+        emit Deposit(_swapath, address(msg.sender));
     }
 
-    function withdrawToETH(uint256 tokenAmount, bytes memory _path) external {
+    function withdrawToETH(uint256 tokenAmount, SwapPath calldata _swapath) external {
+        require(initialedTokens, "initialize needed");
         require(tokenAmount > 0, ">0");
         require(this.balanceOf(msg.sender) >= tokenAmount, "!Insufficient");
-        (SwapPath memory _swapath) = abi.decode(_path, (SwapPath));
 
-        uint256 percentage = (tokenAmount * 10000) / totalSupply();
+        uint256 userShare = tokenAmount.calculatePercentage(totalSupply());
 
         address WETH9 = uniswapV2Router.WETH();
         uint256 totalWETH = 0;
-        for (uint256 i = 0; i < tokens.length; i++) {
-            TokenInfo storage tokenInfo = tokens[i];
-            uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * percentage) / 10000;
-                try this.swapTokenForToken(tokenInfo.token, tokenAmountToWithdraw, _swapath.version, msg.sender, _swapath.path) returns (uint256 ethReceived ) {
-                    totalWETH += ethReceived;
-                } catch {}
+        for (uint256 i = 0; i < basket.length; i++) {
+            Basket storage _basket = basket[i];
+            uint256 tokenAmountToWithdraw =  (_basket.token.balanceOf(address(this)) * userShare) / 10000;
+            totalWETH = this.swapTokenForToken(_basket.token, tokenAmountToWithdraw, _swapath.directions[i].version, address(this), _swapath.directions[i].path);
         }
 
         _burn(msg.sender, tokenAmount);
 
         if(totalWETH > 0){
-            uint256 feeWETH = (totalWETH * withdrawalFee) / 10000;
-            uint256 amountAfterFeeWETH = totalWETH - feeWETH;
+            (uint256 amountAfterFeeWETH, uint256 feeWETH) = totalWETH.calculateAmountAfterFee(withdrawalFee);
             totalFeesWETH += feeWETH;
             IWETH(WETH9).transfer(msg.sender, amountAfterFeeWETH);
         }
-        // emit Withdrawn(msg.sender, totalETH, percentage);
+        emit withdrawalToETH(tokenAmount, _swapath, address(msg.sender));
     }
 
-    function withdrawInKind(uint256 tokenAmount) external {
+    function withdrawInKind(uint256 tokenAmount, SwapPath memory _swapath) external {
+        require(initialedTokens, "initialize needed");
         require(tokenAmount > 0, "W>0");
         require(balanceOf(msg.sender) >= tokenAmount, "!balance");
 
-        uint256 userShare = (tokenAmount * 10000) / totalSupply();
+        uint256 userShare = tokenAmount.calculatePercentage(totalSupply());
         _burn(msg.sender, tokenAmount);
 
-        for (uint256 i = 0; i < tokens.length; i++) {
-            TokenInfo storage tokenInfo = tokens[i];
-            uint256 tokenAmountToWithdraw = (tokenInfo.token.balanceOf(address(this)) * userShare) / 10000;
-            if (tokenAmountToWithdraw > 0) {
-                tokenInfo.token.transfer(msg.sender, tokenAmountToWithdraw);
-            }
+        for (uint256 i = 0; i < basket.length; i++) {
+            Basket storage _basket = basket[i];
+            uint256 tokenAmountToWithdraw = (_basket.token.balanceOf(address(this)) * userShare) / 10000;
+            require(tokenAmountToWithdraw > 0, "!>0");
+            (uint256 amountAfterFee, uint256 feeWETH) = tokenAmountToWithdraw.calculateAmountAfterFee(withdrawalFee);
+            _basket.token.transfer(msg.sender, amountAfterFee);
+            try this.swapTokenForToken(_basket.token, feeWETH, _swapath.directions[i].version, address(this), _swapath.directions[i].path) returns (uint256 ethReceived) {
+                totalFeesWETH += ethReceived;
+            } catch {}
         }
+
+        emit withdrawalInKind(tokenAmount, address(msg.sender));
     }
 
     function withdrawFeesByOwner(address _receiverFeeAddress) external onlyOwner {
@@ -139,7 +147,7 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
         }
     }
 
-    function getAllTokens() external view returns (TokenInfo[] memory) {
-        return tokens;
+    function getBasket() external view returns (Basket[] memory) {
+        return basket;
     }
 }

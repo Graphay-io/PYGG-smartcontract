@@ -9,7 +9,7 @@ const config: HardhatUserConfig = {
     // apiKey: "YB3X78F14NZV8YW6RHTW74GC9XXZZFHZJS", // arbitrum
   },
   solidity: {
-    version: "0.8.20",
+    version: "0.8.28",
     settings: {
       optimizer: {
         enabled: true,
@@ -19,6 +19,12 @@ const config: HardhatUserConfig = {
   },
   
   networks: {
+    hardhat: {
+      forking: {
+        url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.INFURA_API_KEY}`,
+        blockNumber: 66605908
+      }
+    },
     polygon: {
       url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.INFURA_API_KEY}`,
       chainId: 137,

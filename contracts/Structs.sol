@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -8,15 +8,9 @@ enum Version {
     V3
 }
 
-struct TokenInfo {
+struct Basket {
     IERC20 token;
     uint256 targetPercentage;
-}
-
-struct FailedSwap {
-    address user;
-    IERC20 token;
-    uint256 amount;
 }
 
 struct Portfolio {
@@ -27,8 +21,12 @@ struct Portfolio {
     address portfolioAddress;
 }
 
-struct SwapPath {
+struct Direction{
     bytes path;
-    uint256 amountIn;
     Version version;
+}
+
+struct SwapPath {
+    Direction[] directions;
+    uint256 amountIn;
 }
