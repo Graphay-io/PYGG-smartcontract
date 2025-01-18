@@ -116,3 +116,23 @@ export async function getEncodedSwapPath(
 getEncodedSwapPath("0xA3f751662e282E83EC3cBc387d225Ca56dD63D3A", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270").then((res) => {
   console.log(res);
 });
+
+getEncodedSwapPath("0xC3C7d422809852031b44ab29EEC9F1EfF2A58756", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270").then((res) => {
+  console.log(res);
+});
+
+getEncodedSwapPath("0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270").then((res) => {
+  console.log(res);
+});
+
+getEncodedSwapPath("0xbF7970D56a150cD0b60BD08388A4A75a27777777", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270").then((res) => {
+  console.log(res);
+});
+
+getEncodedSwapPath("0x61299774020dA444Af134c82fa83E3810b309991", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270").then((res) => {
+  console.log(res);
+});
+
+getEncodedSwapPath("0xd0258a3fD00f38aa8090dfee343f10A9D4d30D3F", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270").then((res) => {
+  console.log(res);
+});

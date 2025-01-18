@@ -109,7 +109,7 @@ abstract contract SwapOperationManager {
         uniswapV3Router.exactInput{value: _ethAmount}(params);
     }
     
-    function setSlippageTolerance(uint256 _slippageTolerance) external {
+    function _setSlippageTolerance(uint256 _slippageTolerance) internal {
         require(_slippageTolerance <= 10000, "!SLP");
         slippageTolerance = _slippageTolerance;
     }

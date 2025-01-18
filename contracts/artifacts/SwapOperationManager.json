@@ -49,173 +49,14 @@
 		},
 		"gasEstimates": null,
 		"methodIdentifiers": {
-			"failedSwaps(uint256)": "378a653c",
-			"getFailedSwaps(address)": "91ebe50f",
-			"getWETHaddress()": "df0e0768",
-			"profitToETH()": "86bc55db",
-			"profitToWETH()": "86c14663",
-			"retryFailedSwaps(address)": "3d7526f7",
-			"setSlippageTolerance(uint256)": "117da1ee",
 			"slippageTolerance()": "d03153aa",
-			"swapETHForToken(address,uint256,string,uint24)": "39c0f5d2",
-			"swapTokenForETH(address,uint256,string,uint24,address)": "a9492aeb",
+			"swapTokenForToken(address,uint256,uint8,address,bytes)": "74a66061",
 			"uniswapV2Router()": "1694505e",
 			"uniswapV3Quoter()": "4d20d0f8",
-			"uniswapV3Router()": "2c76d7a6",
-			"userFailedSwaps(address)": "36a43f2b"
+			"uniswapV3Router()": "2c76d7a6"
 		}
 	},
 	"abi": [
-		{
-			"inputs": [
-				{
-					"internalType": "uint256",
-					"name": "",
-					"type": "uint256"
-				}
-			],
-			"name": "failedSwaps",
-			"outputs": [
-				{
-					"internalType": "address",
-					"name": "user",
-					"type": "address"
-				},
-				{
-					"internalType": "contract IERC20",
-					"name": "token",
-					"type": "address"
-				},
-				{
-					"internalType": "uint256",
-					"name": "amount",
-					"type": "uint256"
-				},
-				{
-					"internalType": "string",
-					"name": "version",
-					"type": "string"
-				},
-				{
-					"internalType": "uint24",
-					"name": "feeTier",
-					"type": "uint24"
-				}
-			],
-			"stateMutability": "view",
-			"type": "function"
-		},
-		{
-			"inputs": [
-				{
-					"internalType": "address",
-					"name": "user",
-					"type": "address"
-				}
-			],
-			"name": "getFailedSwaps",
-			"outputs": [
-				{
-					"components": [
-						{
-							"internalType": "address",
-							"name": "user",
-							"type": "address"
-						},
-						{
-							"internalType": "contract IERC20",
-							"name": "token",
-							"type": "address"
-						},
-						{
-							"internalType": "uint256",
-							"name": "amount",
-							"type": "uint256"
-						},
-						{
-							"internalType": "string",
-							"name": "version",
-							"type": "string"
-						},
-						{
-							"internalType": "uint24",
-							"name": "feeTier",
-							"type": "uint24"
-						}
-					],
-					"internalType": "struct FailedSwap[]",
-					"name": "",
-					"type": "tuple[]"
-				}
-			],
-			"stateMutability": "view",
-			"type": "function"
-		},
-		{
-			"inputs": [],
-			"name": "getWETHaddress",
-			"outputs": [
-				{
-					"internalType": "address",
-					"name": "",
-					"type": "address"
-				}
-			],
-			"stateMutability": "view",
-			"type": "function"
-		},
-		{
-			"inputs": [],
-			"name": "profitToETH",
-			"outputs": [
-				{
-					"internalType": "uint256",
-					"name": "",
-					"type": "uint256"
-				}
-			],
-			"stateMutability": "view",
-			"type": "function"
-		},
-		{
-			"inputs": [],
-			"name": "profitToWETH",
-			"outputs": [
-				{
-					"internalType": "uint256",
-					"name": "",
-					"type": "uint256"
-				}
-			],
-			"stateMutability": "view",
-			"type": "function"
-		},
-		{
-			"inputs": [
-				{
-					"internalType": "address",
-					"name": "user",
-					"type": "address"
-				}
-			],
-			"name": "retryFailedSwaps",
-			"outputs": [],
-			"stateMutability": "nonpayable",
-			"type": "function"
-		},
-		{
-			"inputs": [
-				{
-					"internalType": "uint256",
-					"name": "_slippageTolerance",
-					"type": "uint256"
-				}
-			],
-			"name": "setSlippageTolerance",
-			"outputs": [],
-			"stateMutability": "nonpayable",
-			"type": "function"
-		},
 		{
 			"inputs": [],
 			"name": "slippageTolerance",
@@ -238,54 +79,26 @@
 				},
 				{
 					"internalType": "uint256",
-					"name": "_ethAmount",
-					"type": "uint256"
-				},
-				{
-					"internalType": "string",
-					"name": "version",
-					"type": "string"
-				},
-				{
-					"internalType": "uint24",
-					"name": "feeTier",
-					"type": "uint24"
-				}
-			],
-			"name": "swapETHForToken",
-			"outputs": [],
-			"stateMutability": "payable",
-			"type": "function"
-		},
-		{
-			"inputs": [
-				{
-					"internalType": "contract IERC20",
-					"name": "_token",
-					"type": "address"
-				},
-				{
-					"internalType": "uint256",
 					"name": "_amountIn",
 					"type": "uint256"
 				},
 				{
-					"internalType": "string",
-					"name": "version",
-					"type": "string"
-				},
-				{
-					"internalType": "uint24",
-					"name": "feeTier",
-					"type": "uint24"
+					"internalType": "enum Version",
+					"name": "_version",
+					"type": "uint8"
 				},
 				{
 					"internalType": "address",
 					"name": "_receiver",
 					"type": "address"
+				},
+				{
+					"internalType": "bytes",
+					"name": "_path",
+					"type": "bytes"
 				}
 			],
-			"name": "swapTokenForETH",
+			"name": "swapTokenForToken",
 			"outputs": [
 				{
 					"internalType": "uint256",
@@ -330,25 +143,6 @@
 					"internalType": "contract ISwapRouter",
 					"name": "",
 					"type": "address"
-				}
-			],
-			"stateMutability": "view",
-			"type": "function"
-		},
-		{
-			"inputs": [
-				{
-					"internalType": "address",
-					"name": "",
-					"type": "address"
-				}
-			],
-			"name": "userFailedSwaps",
-			"outputs": [
-				{
-					"internalType": "uint256",
-					"name": "",
-					"type": "uint256"
 				}
 			],
 			"stateMutability": "view",

@@ -1,6 +1,6 @@
 {
 	"compiler": {
-		"version": "0.8.20+commit.a1b79de6"
+		"version": "0.8.28+commit.7893614a"
 	},
 	"language": "Solidity",
 	"output": {
@@ -148,25 +148,6 @@
 				"anonymous": false,
 				"inputs": [
 					{
-						"indexed": false,
-						"internalType": "address[]",
-						"name": "_tokens",
-						"type": "address[]"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256[]",
-						"name": "_targetPercentage",
-						"type": "uint256[]"
-					}
-				],
-				"name": "AddToken",
-				"type": "event"
-			},
-			{
-				"anonymous": false,
-				"inputs": [
-					{
 						"indexed": true,
 						"internalType": "address",
 						"name": "owner",
@@ -186,6 +167,49 @@
 					}
 				],
 				"name": "Approval",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"components": [
+							{
+								"components": [
+									{
+										"internalType": "bytes",
+										"name": "path",
+										"type": "bytes"
+									},
+									{
+										"internalType": "enum Version",
+										"name": "version",
+										"type": "uint8"
+									}
+								],
+								"internalType": "struct Direction[]",
+								"name": "directions",
+								"type": "tuple[]"
+							},
+							{
+								"internalType": "uint256",
+								"name": "amountIn",
+								"type": "uint256"
+							}
+						],
+						"indexed": false,
+						"internalType": "struct SwapPath",
+						"name": "_swapath",
+						"type": "tuple"
+					},
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "_sender",
+						"type": "address"
+					}
+				],
+				"name": "Deposit",
 				"type": "event"
 			},
 			{
@@ -230,6 +254,74 @@
 					}
 				],
 				"name": "Transfer",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "_tokenAmount",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "_receiver",
+						"type": "address"
+					}
+				],
+				"name": "withdrawalInKind",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "_tokenAmount",
+						"type": "uint256"
+					},
+					{
+						"components": [
+							{
+								"components": [
+									{
+										"internalType": "bytes",
+										"name": "path",
+										"type": "bytes"
+									},
+									{
+										"internalType": "enum Version",
+										"name": "version",
+										"type": "uint8"
+									}
+								],
+								"internalType": "struct Direction[]",
+								"name": "directions",
+								"type": "tuple[]"
+							},
+							{
+								"internalType": "uint256",
+								"name": "amountIn",
+								"type": "uint256"
+							}
+						],
+						"indexed": false,
+						"internalType": "struct SwapPath",
+						"name": "_swapath",
+						"type": "tuple"
+					},
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "_receiver",
+						"type": "address"
+					}
+				],
+				"name": "withdrawalToETH",
 				"type": "event"
 			},
 			{
@@ -346,7 +438,7 @@
 				],
 				"name": "deposit",
 				"outputs": [],
-				"stateMutability": "payable",
+				"stateMutability": "nonpayable",
 				"type": "function"
 			},
 			{
@@ -382,37 +474,8 @@
 				"type": "function"
 			},
 			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"name": "failedSwaps",
-				"outputs": [
-					{
-						"internalType": "address",
-						"name": "user",
-						"type": "address"
-					},
-					{
-						"internalType": "contract IERC20",
-						"name": "token",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amount",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
 				"inputs": [],
-				"name": "getAllTokens",
+				"name": "getBasket",
 				"outputs": [
 					{
 						"components": [
@@ -427,7 +490,7 @@
 								"type": "uint256"
 							}
 						],
-						"internalType": "struct TokenInfo[]",
+						"internalType": "struct Basket[]",
 						"name": "",
 						"type": "tuple[]"
 					}
@@ -589,6 +652,19 @@
 			},
 			{
 				"inputs": [],
+				"name": "totalFeesWETH",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
 				"name": "totalSupply",
 				"outputs": [
 					{
@@ -709,25 +785,6 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"name": "userFailedSwaps",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
 						"name": "_receiverFeeAddress",
 						"type": "address"
 					}
@@ -743,6 +800,35 @@
 						"internalType": "uint256",
 						"name": "tokenAmount",
 						"type": "uint256"
+					},
+					{
+						"components": [
+							{
+								"components": [
+									{
+										"internalType": "bytes",
+										"name": "path",
+										"type": "bytes"
+									},
+									{
+										"internalType": "enum Version",
+										"name": "version",
+										"type": "uint8"
+									}
+								],
+								"internalType": "struct Direction[]",
+								"name": "directions",
+								"type": "tuple[]"
+							},
+							{
+								"internalType": "uint256",
+								"name": "amountIn",
+								"type": "uint256"
+							}
+						],
+						"internalType": "struct SwapPath",
+						"name": "_swapath",
+						"type": "tuple"
 					}
 				],
 				"name": "withdrawInKind",
@@ -930,7 +1016,7 @@
 		"compilationTarget": {
 			"contracts/PYGGportfolioManagement.sol": "PYGGportfolioManagement"
 		},
-		"evmVersion": "shanghai",
+		"evmVersion": "cancun",
 		"libraries": {},
 		"metadata": {
 			"bytecodeHash": "ipfs"
@@ -1015,35 +1101,35 @@
 			]
 		},
 		"contracts/PYGGportfolioManagement.sol": {
-			"keccak256": "0x26c581d74969722ba5b7c6f98283bd84178ec0462f3ec5d6ca27c47a90da8672",
+			"keccak256": "0x9ca4b73a88b97b7a4d233d24d248d08112edee5e4cd27ecbd878effe2452d9fb",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://fcaff0f78e2d671ab5c43d212ade72425201be6b560f02b00ae48ecbcbca11ca",
-				"dweb:/ipfs/QmSmsjHYRiFYd9pAzDVGCm7dF9LYxsYkHWhXUGfUcYR3sW"
+				"bzz-raw://c1737eeb4dfbb7ad88b39674b3663e7b9e669c68eb99041ac2da1a224a246703",
+				"dweb:/ipfs/QmdaCBWE4owSfNcgmRdnzvpcQV4Q4At8QWEfYHYJdQguTp"
 			]
 		},
 		"contracts/Structs.sol": {
-			"keccak256": "0x4e8307ac3e2e42be4dd5bd9cc15e9ddfe601e2f05c18c215d213e7c39827c83e",
+			"keccak256": "0xcb2ded60ada5d267e2dedf6f873e2b1c3e939be192f4c534ced3fe2032062c5b",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://37de5d851ca5718d71167604156ef4d86df77d21263828543efbc50f616399f1",
-				"dweb:/ipfs/QmQ9phVtunGU1k59p4dx6CM96RA6hDKVx5qzDxqirym8Yf"
+				"bzz-raw://624fff9cb3b439f1cf917b99159596a07daf528daa63727fef804dc0141e063c",
+				"dweb:/ipfs/QmXjbhntndLgk7xQo2kgDAiRxxRv865jUdwReHCbgNEXFG"
 			]
 		},
 		"contracts/SwapOperationManager.sol": {
-			"keccak256": "0x20bab3ce70fad3a33a14ca5f432b81daa0d052586f97067e2ff58030dc06898c",
+			"keccak256": "0xb60efb6c6c4ec0cb13c55b217336d40ea0a5fbffb311b8e1307d7f23ead39e5a",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://890d8123f9b90551412f09cf0da0a61ce147ae4595d647a62ceb35ad0ad12ce0",
-				"dweb:/ipfs/QmdGSwAuBJ9gttg1ELoEdELUjSy5Zr44vYqsuTa2TAi9ZT"
+				"bzz-raw://517801b04ac2e6487f795b08dd9ecb56d6ec8d04db4a7ab2c5a9a0de0db05d4c",
+				"dweb:/ipfs/QmTAYe7LFJrYMjx9Eo3mzTyJwhVTnPXQeYBpMCWAuDjSMr"
 			]
 		},
 		"contracts/interface/IPortfolioFactory.sol": {
-			"keccak256": "0x279e26d2b173b5f0af3c7ebde4743c9025d7d124f8ee8e909108d8d1129e30f1",
+			"keccak256": "0xd0b4ddaff4e099b90c8bc78f9f0b8a6669180b9a1042a1d26e61f042aeec0800",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://de5efc1ed3d3a57b08b84250daa8fd836fb021c8d924edf71c45ae0cb8c764fb",
-				"dweb:/ipfs/QmbpJBwGxCic8Xvg6VA67uPRuqKBDLuYGT5nG7reGR4XYn"
+				"bzz-raw://30787328ee84af55e7f7987cefbf0efa25bf325c626bf4c65841f190970fde68",
+				"dweb:/ipfs/QmXFxiwvqs1AHycQ45Hjz6U8Nq4GzNnLmhyeYEFn7nyBuT"
 			]
 		},
 		"contracts/interface/IUniswapV2Router01.sol": {
@@ -1076,11 +1162,11 @@
 			]
 		},
 		"contracts/lib/FeeCalculation.sol": {
-			"keccak256": "0x5dc65076d86523d6e8e98957acb3c969d27839eadd5ea24fd2df9b15fc120b5f",
+			"keccak256": "0x2f9b3f17d66b4b19a6b705369f9ce77b9bb3ea46f7eaf584f177bcd078eec29e",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://8c6e0f50393bbca4205d9cd9e8b12f7bcc47a30cc48c2bafefa7d56bc7fcc3a5",
-				"dweb:/ipfs/QmSuxnc4rRteD6PJtfvyARPaR6k5y7DmKgnBaidVAfkctG"
+				"bzz-raw://5d88a6ce0dc22661db2320b5a496442b9414105ed7b0a217195df152beeba551",
+				"dweb:/ipfs/QmdCJHPmeNwizhKEtTNY8n7UHzT3ZuA6hKUYM14bSJEwSs"
 			]
 		}
 	},

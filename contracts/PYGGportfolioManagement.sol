@@ -157,6 +157,9 @@ contract PYGGportfolioManagement is Ownable, ERC20, SwapOperationManager {
         }
     }
 
+    function setSlippageTolerance(uint256 _slippageTolerance) external onlyOwner {
+        _setSlippageTolerance(_slippageTolerance);
+    }
 
     function getBasket() external view returns (Basket[] memory) {
         return basket;
